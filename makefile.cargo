@@ -101,6 +101,7 @@ GLSLANG_CPP_SRC = \
 	src/common/string_utils.cpp \
 	src/common/tls.cpp \
 	src/common/utilities.cpp \
+	src/libANGLE/Platform.cpp \
 	src/third_party/compiler/ArrayBoundsClamper.cpp
 
 
