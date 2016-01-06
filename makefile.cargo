@@ -108,6 +108,8 @@ GLSLANG_CPP_SRC = \
 CXXFLAGS += \
 	-std=gnu++11 \
 	-DANGLE_TRANSLATOR_STATIC \
+	-DLIBGLESV2_EXPORT_H_ \
+	-DANGLE_EXPORT="" \
 	-Iinclude \
 	-Isrc \
 	-O3 \
