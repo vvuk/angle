@@ -14,6 +14,9 @@
 
 #include <stdint.h>
 
+#include <bitset>
+#include <unordered_map>
+
 namespace gl
 {
 class Buffer;
@@ -21,6 +24,20 @@ class State;
 class Program;
 struct VertexAttribute;
 struct VertexAttribCurrentValueData;
+
+enum PrimitiveType
+{
+    PRIMITIVE_POINTS,
+    PRIMITIVE_LINES,
+    PRIMITIVE_LINE_STRIP,
+    PRIMITIVE_LINE_LOOP,
+    PRIMITIVE_TRIANGLES,
+    PRIMITIVE_TRIANGLE_STRIP,
+    PRIMITIVE_TRIANGLE_FAN,
+    PRIMITIVE_TYPE_MAX,
+};
+
+PrimitiveType GetPrimitiveType(GLenum drawMode);
 
 enum SamplerType
 {
@@ -52,13 +69,21 @@ typedef Color<unsigned int> ColorUI;
 
 struct Rectangle
 {
+    Rectangle() : x(0), y(0), width(0), height(0) {}
+    Rectangle(int x_in, int y_in, int width_in, int height_in)
+        : x(x_in), y(y_in), width(width_in), height(height_in)
+    {
+    }
+
+    int x0() const { return x; }
+    int y0() const { return y; }
+    int x1() const { return x + width; }
+    int y1() const { return y + height; }
+
     int x;
     int y;
     int width;
     int height;
-
-    Rectangle() : x(0), y(0), width(0), height(0) { }
-    Rectangle(int x_in, int y_in, int width_in, int height_in) : x(x_in), y(y_in), width(width_in), height(height_in) { }
 };
 
 bool operator==(const Rectangle &a, const Rectangle &b);
@@ -87,6 +112,9 @@ struct Extents
 
     bool empty() const { return (width * height * depth) == 0; }
 };
+
+bool operator==(const Extents &lhs, const Extents &rhs);
+bool operator!=(const Extents &lhs, const Extents &rhs);
 
 struct Box
 {
@@ -162,35 +190,57 @@ struct DepthStencilState
     GLuint stencilBackWritemask;
 };
 
+// State from Table 6.10 (state per sampler object)
 struct SamplerState
 {
     SamplerState();
 
     GLenum minFilter;
     GLenum magFilter;
+
     GLenum wrapS;
     GLenum wrapT;
     GLenum wrapR;
+
+    // From EXT_texture_filter_anisotropic
     float maxAnisotropy;
 
-    GLint baseLevel;
-    GLint maxLevel;
     GLfloat minLod;
     GLfloat maxLod;
 
     GLenum compareMode;
     GLenum compareFunc;
+};
+
+bool operator==(const SamplerState &a, const SamplerState &b);
+bool operator!=(const SamplerState &a, const SamplerState &b);
+
+// State from Table 6.9 (state per texture object) in the OpenGL ES 3.0.2 spec.
+struct TextureState
+{
+    TextureState();
 
     GLenum swizzleRed;
     GLenum swizzleGreen;
     GLenum swizzleBlue;
     GLenum swizzleAlpha;
 
+    SamplerState samplerState;
+
+    GLuint baseLevel;
+    GLuint maxLevel;
+
+    bool immutableFormat;
+    GLuint immutableLevels;
+
+    // From GL_ANGLE_texture_usage
+    GLenum usage;
+
     bool swizzleRequired() const;
 };
 
-bool operator==(const SamplerState &a, const SamplerState &b);
-bool operator!=(const SamplerState &a, const SamplerState &b);
+bool operator==(const TextureState &a, const TextureState &b);
+bool operator!=(const TextureState &a, const TextureState &b);
 
 struct PixelUnpackState
 {
@@ -247,6 +297,16 @@ struct PixelPackState
     {}
 };
 
+// Used in Program and VertexArray.
+typedef std::bitset<MAX_VERTEX_ATTRIBS> AttributesMask;
+
+// Use in Program
+typedef std::bitset<IMPLEMENTATION_MAX_COMBINED_SHADER_UNIFORM_BUFFERS> UniformBlockBindingMask;
+
+// A map of GL objects indexed by object ID. The specific map implementation may change.
+// Client code should treat it as a std::map.
+template <class ResourceT>
+using ResourceMap = std::unordered_map<GLuint, ResourceT *>;
 }
 
 namespace rx

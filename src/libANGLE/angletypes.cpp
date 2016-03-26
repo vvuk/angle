@@ -15,6 +15,30 @@
 namespace gl
 {
 
+PrimitiveType GetPrimitiveType(GLenum drawMode)
+{
+    switch (drawMode)
+    {
+        case GL_POINTS:
+            return PRIMITIVE_POINTS;
+        case GL_LINES:
+            return PRIMITIVE_LINES;
+        case GL_LINE_STRIP:
+            return PRIMITIVE_LINE_STRIP;
+        case GL_LINE_LOOP:
+            return PRIMITIVE_LINE_LOOP;
+        case GL_TRIANGLES:
+            return PRIMITIVE_TRIANGLES;
+        case GL_TRIANGLE_STRIP:
+            return PRIMITIVE_TRIANGLE_STRIP;
+        case GL_TRIANGLE_FAN:
+            return PRIMITIVE_TRIANGLE_FAN;
+        default:
+            UNREACHABLE();
+            return PRIMITIVE_TYPE_MAX;
+    }
+}
+
 SamplerState::SamplerState()
     : minFilter(GL_NEAREST_MIPMAP_LINEAR),
       magFilter(GL_LINEAR),
@@ -22,19 +46,28 @@ SamplerState::SamplerState()
       wrapT(GL_REPEAT),
       wrapR(GL_REPEAT),
       maxAnisotropy(1.0f),
-      baseLevel(0),
-      maxLevel(1000),
       minLod(-1000.0f),
       maxLod(1000.0f),
       compareMode(GL_NONE),
-      compareFunc(GL_LEQUAL),
-      swizzleRed(GL_RED),
+      compareFunc(GL_LEQUAL)
+{
+}
+
+TextureState::TextureState()
+    : swizzleRed(GL_RED),
       swizzleGreen(GL_GREEN),
       swizzleBlue(GL_BLUE),
-      swizzleAlpha(GL_ALPHA)
-{}
+      swizzleAlpha(GL_ALPHA),
+      samplerState(),
+      baseLevel(0),
+      maxLevel(1000),
+      immutableFormat(false),
+      immutableLevels(0),
+      usage(GL_NONE)
+{
+}
 
-bool SamplerState::swizzleRequired() const
+bool TextureState::swizzleRequired() const
 {
     return swizzleRed != GL_RED || swizzleGreen != GL_GREEN ||
            swizzleBlue != GL_BLUE || swizzleAlpha != GL_ALPHA;
@@ -101,4 +134,13 @@ bool Box::operator!=(const Box &other) const
     return !(*this == other);
 }
 
+bool operator==(const Extents &lhs, const Extents &rhs)
+{
+    return lhs.width == rhs.width && lhs.height == rhs.height && lhs.depth == rhs.depth;
+}
+
+bool operator!=(const Extents &lhs, const Extents &rhs)
+{
+    return !(lhs == rhs);
+}
 }

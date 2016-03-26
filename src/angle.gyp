@@ -16,6 +16,8 @@
         'angle_enable_d3d9%': 0,
         'angle_enable_d3d11%': 0,
         'angle_enable_gl%': 0,
+        'angle_enable_essl%': 1, # Enable this for all configs by default
+        'angle_enable_glsl%': 1, # Enable this for all configs by default
         'angle_enable_hlsl%': 0,
         'angle_link_glx%': 0,
         'angle_gl_library_type%': 'shared_library',
@@ -28,7 +30,7 @@
                 'angle_enable_d3d11%': 1,
                 'angle_enable_hlsl%': 1,
             }],
-            ['OS=="linux" and use_x11==1 and chromeos==0',
+            ['OS=="linux"',
             {
                 'angle_enable_gl%': 1,
             }],
@@ -86,15 +88,6 @@
             },
             'conditions':
             [
-                ['angle_build_winrt==1',
-                {
-                    'msvs_enable_winrt' : '1',
-                    'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
-                }],
-                ['angle_build_winphone==1',
-                {
-                    'msvs_enable_winphone' : '1',
-                }],
                 ['OS=="win"',
                 {
                     'configurations':
@@ -127,13 +120,7 @@
             [
                 ['angle_build_winrt==1',
                 {
-                    'msvs_enable_winrt' : '1',
-                    'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
                     'type' : 'shared_library',
-                }],
-                ['angle_build_winphone==1',
-                {
-                    'msvs_enable_winphone' : '1',
                 }],
             ],
         },
@@ -176,13 +163,7 @@
                     [
                         ['angle_build_winrt==1',
                         {
-                            'msvs_enable_winrt' : '1',
-                            'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
                             'type' : 'shared_library',
-                        }],
-                        ['angle_build_winphone==1',
-                        {
-                            'msvs_enable_winphone' : '1',
                         }],
                     ],
                 }
@@ -214,13 +195,7 @@
                     [
                         ['angle_build_winrt==1',
                         {
-                            'msvs_enable_winrt' : '1',
-                            'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
                             'type' : 'shared_library',
-                        }],
-                        ['angle_build_winphone==1',
-                        {
-                            'msvs_enable_winphone' : '1',
                         }],
                     ],
                 }
@@ -259,13 +234,7 @@
                         }],
                         ['angle_build_winrt==1',
                         {
-                            'msvs_enable_winrt' : '1',
-                            'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
                             'type' : 'shared_library',
-                        }],
-                        ['angle_build_winphone==1',
-                        {
-                            'msvs_enable_winphone' : '1',
                         }],
                     ]
                 },

@@ -69,14 +69,29 @@ inline int clampToInt(unsigned int x)
 template <typename DestT, typename SrcT>
 inline DestT clampCast(SrcT value)
 {
-    // This assumes SrcT can properly represent DestT::min/max
-    // Unfortunately we can't use META_ASSERT without C++11 constexpr support
-    ASSERT(static_cast<DestT>(static_cast<SrcT>(std::numeric_limits<DestT>::min())) == std::numeric_limits<DestT>::min());
-    ASSERT(static_cast<DestT>(static_cast<SrcT>(std::numeric_limits<DestT>::max())) == std::numeric_limits<DestT>::max());
+    static const DestT destLo = std::numeric_limits<DestT>::min();
+    static const DestT destHi = std::numeric_limits<DestT>::max();
+    static const SrcT srcLo = static_cast<SrcT>(destLo);
+    static const SrcT srcHi = static_cast<SrcT>(destHi);
 
-    SrcT lo = static_cast<SrcT>(std::numeric_limits<DestT>::min());
-    SrcT hi = static_cast<SrcT>(std::numeric_limits<DestT>::max());
-    return static_cast<DestT>(value > lo ? (value > hi ? hi : value) : lo);
+    // When value is outside of or equal to the limits for DestT we use the DestT limit directly.
+    // This avoids undefined behaviors due to loss of precision when converting from floats to
+    // integers:
+    //    destHi for ints is 2147483647 but the closest float number is around 2147483648, so when
+    //  doing a conversion from float to int we run into an UB because the float is outside of the
+    //  range representable by the int.
+    if (value <= srcLo)
+    {
+        return destLo;
+    }
+    else if (value >= srcHi)
+    {
+        return destHi;
+    }
+    else
+    {
+        return static_cast<DestT>(value);
+    }
 }
 
 template<typename T, typename MIN, typename MAX>
@@ -151,7 +166,7 @@ destType bitCast(const sourceType &source)
 
 inline unsigned short float32ToFloat16(float fp32)
 {
-    unsigned int fp32i = (unsigned int&)fp32;
+    unsigned int fp32i = bitCast<unsigned int>(fp32);
     unsigned int sign = (fp32i & 0x80000000) >> 16;
     unsigned int abs = fp32i & 0x7FFFFFFF;
 
@@ -478,9 +493,10 @@ inline unsigned int average(unsigned int a, unsigned int b)
     return ((a ^ b) >> 1) + (a & b);
 }
 
-inline signed int average(signed int a, signed int b)
+inline int average(int a, int b)
 {
-    return ((long long)a + (long long)b) / 2;
+    long long average = (static_cast<long long>(a) + static_cast<long long>(b)) / 2ll;
+    return static_cast<int>(average);
 }
 
 inline float average(float a, float b)
@@ -503,7 +519,6 @@ inline unsigned int averageFloat10(unsigned int a, unsigned int b)
     return float32ToFloat10((float10ToFloat32(static_cast<unsigned short>(a)) + float10ToFloat32(static_cast<unsigned short>(b))) * 0.5f);
 }
 
-// Represents intervals of the type [a, b)
 template <typename T>
 struct Range
 {
@@ -542,6 +557,26 @@ struct Range
 typedef Range<int> RangeI;
 typedef Range<unsigned int> RangeUI;
 
+struct IndexRange
+{
+    IndexRange() : IndexRange(0, 0, 0) {}
+    IndexRange(size_t start_, size_t end_, size_t vertexIndexCount_)
+        : start(start_), end(end_), vertexIndexCount(vertexIndexCount_)
+    {
+        ASSERT(start <= end);
+    }
+
+    // Number of vertices in the range.
+    size_t vertexCount() const { return (end - start) + 1; }
+
+    // Inclusive range of indices that are not primitive restart
+    size_t start;
+    size_t end;
+
+    // Number of non-primitive restart indices
+    size_t vertexIndexCount;
+};
+
 // First, both normalized floating-point values are converted into 16-bit integer values.
 // Then, the results are packed into the returned 32-bit unsigned integer.
 // The first float value will be written to the least significant bits of the output;
@@ -550,9 +585,10 @@ typedef Range<unsigned int> RangeUI;
 // packSnorm2x16 : round(clamp(c, -1, +1) * 32767.0)
 inline uint32_t packSnorm2x16(float f1, float f2)
 {
-    uint16_t leastSignificantBits = static_cast<uint16_t>(roundf(clamp(f1, -1.0f, 1.0f) * 32767.0f));
-    uint16_t mostSignificantBits = static_cast<uint16_t>(roundf(clamp(f2, -1.0f, 1.0f) * 32767.0f));
-    return static_cast<uint32_t>(mostSignificantBits) << 16 | static_cast<uint32_t>(leastSignificantBits);
+    int16_t leastSignificantBits = static_cast<int16_t>(roundf(clamp(f1, -1.0f, 1.0f) * 32767.0f));
+    int16_t mostSignificantBits = static_cast<int16_t>(roundf(clamp(f2, -1.0f, 1.0f) * 32767.0f));
+    return static_cast<uint32_t>(mostSignificantBits) << 16 |
+           (static_cast<uint32_t>(leastSignificantBits) & 0xFFFF);
 }
 
 // First, unpacks a single 32-bit unsigned integer u into a pair of 16-bit unsigned integers. Then, each

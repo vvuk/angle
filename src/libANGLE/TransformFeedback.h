@@ -10,11 +10,13 @@
 #include "libANGLE/RefCountObject.h"
 
 #include "common/angleutils.h"
+#include "libANGLE/Debug.h"
 
 #include "angle_gl.h"
 
 namespace rx
 {
+class ImplFactory;
 class TransformFeedbackImpl;
 }
 
@@ -23,11 +25,14 @@ namespace gl
 class Buffer;
 struct Caps;
 
-class TransformFeedback : public RefCountObject
+class TransformFeedback final : public RefCountObject, public LabeledObject
 {
   public:
-    TransformFeedback(rx::TransformFeedbackImpl* impl, GLuint id, const Caps &caps);
+    TransformFeedback(rx::ImplFactory *implFactory, GLuint id, const Caps &caps);
     virtual ~TransformFeedback();
+
+    void setLabel(const std::string &label) override;
+    const std::string &getLabel() const override;
 
     void begin(GLenum primitiveMode);
     void end();
@@ -45,11 +50,15 @@ class TransformFeedback : public RefCountObject
     const OffsetBindingPointer<Buffer> &getIndexedBuffer(size_t index) const;
     size_t getIndexedBufferCount() const;
 
+    void detachBuffer(GLuint bufferName);
+
     rx::TransformFeedbackImpl *getImplementation();
     const rx::TransformFeedbackImpl *getImplementation() const;
 
   private:
     rx::TransformFeedbackImpl* mImplementation;
+
+    std::string mLabel;
 
     bool mActive;
     GLenum mPrimitiveMode;

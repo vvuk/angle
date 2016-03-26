@@ -7,6 +7,13 @@
 #ifndef ANGLE_TEST_CONFIGS_H_
 #define ANGLE_TEST_CONFIGS_H_
 
+// On Linux EGL/egl.h includes X.h which does defines for some very common
+// names that are used by gtest (like None and Bool) and causes a lot of
+// compilation errors. To work around this, even if this file doesn't use it,
+// we include gtest before EGL so that it compiles fine in other files that
+// want to use gtest.
+#include <gtest/gtest.h>
+
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
@@ -45,6 +52,7 @@ EGLPlatformParameters D3D9_NULL();
 EGLPlatformParameters D3D9_REFERENCE();
 
 EGLPlatformParameters D3D11();
+EGLPlatformParameters D3D11(EGLenum presentPath);
 EGLPlatformParameters D3D11_FL11_1();
 EGLPlatformParameters D3D11_FL11_0();
 EGLPlatformParameters D3D11_FL10_1();
@@ -72,6 +80,7 @@ EGLPlatformParameters OPENGL(EGLint major, EGLint minor);
 EGLPlatformParameters OPENGL_NULL();
 
 EGLPlatformParameters OPENGLES();
+EGLPlatformParameters OPENGLES(EGLint major, EGLint minor);
 
 } // namespace egl_platform
 
@@ -80,6 +89,7 @@ PlatformParameters ES2_D3D9();
 PlatformParameters ES2_D3D9_REFERENCE();
 
 PlatformParameters ES2_D3D11();
+PlatformParameters ES2_D3D11(EGLenum presentPath);
 PlatformParameters ES2_D3D11_FL11_0();
 PlatformParameters ES2_D3D11_FL10_1();
 PlatformParameters ES2_D3D11_FL10_0();
@@ -121,7 +131,9 @@ PlatformParameters ES3_OPENGL();
 PlatformParameters ES3_OPENGL(EGLint major, EGLint minor);
 
 PlatformParameters ES2_OPENGLES();
+PlatformParameters ES2_OPENGLES(EGLint major, EGLint minor);
 PlatformParameters ES3_OPENGLES();
+PlatformParameters ES3_OPENGLES(EGLint major, EGLint minor);
 
 } // namespace angle
 

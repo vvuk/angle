@@ -22,6 +22,7 @@ namespace gl
 Renderbuffer::Renderbuffer(rx::RenderbufferImpl *impl, GLuint id)
     : egl::ImageSibling(id),
       mRenderbuffer(impl),
+      mLabel(),
       mWidth(0),
       mHeight(0),
       mInternalFormat(GL_RGBA4),
@@ -32,6 +33,16 @@ Renderbuffer::Renderbuffer(rx::RenderbufferImpl *impl, GLuint id)
 Renderbuffer::~Renderbuffer()
 {
     SafeDelete(mRenderbuffer);
+}
+
+void Renderbuffer::setLabel(const std::string &label)
+{
+    mLabel = label;
+}
+
+const std::string &Renderbuffer::getLabel() const
+{
+    return mLabel;
 }
 
 Error Renderbuffer::setStorage(GLenum internalformat, size_t width, size_t height)
@@ -151,4 +162,23 @@ GLuint Renderbuffer::getStencilSize() const
     return GetInternalFormatInfo(mInternalFormat).stencilBits;
 }
 
+void Renderbuffer::onAttach()
+{
+    addRef();
+}
+
+void Renderbuffer::onDetach()
+{
+    release();
+}
+
+GLuint Renderbuffer::getId() const
+{
+    return id();
+}
+
+Extents Renderbuffer::getAttachmentSize(const FramebufferAttachment::Target & /*target*/) const
+{
+    return Extents(mWidth, mHeight, 1);
+}
 }

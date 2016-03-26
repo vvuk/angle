@@ -106,12 +106,19 @@ class SixteenBppTextureTest : public ANGLETest
         glBindTexture(GL_TEXTURE_2D, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
 
-        glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        EXPECT_PIXEL_EQ(0, 0, 255, 0, 0, 255);
-        EXPECT_PIXEL_EQ(1, 0, 255, 0, 0, 255);
-        EXPECT_PIXEL_EQ(1, 1, 255, 0, 0, 255);
-        EXPECT_PIXEL_EQ(0, 1, 255, 0, 0, 255);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_UNSUPPORTED)
+        {
+            glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            EXPECT_PIXEL_EQ(0, 0, 255, 0, 0, 255);
+            EXPECT_PIXEL_EQ(1, 0, 255, 0, 0, 255);
+            EXPECT_PIXEL_EQ(1, 1, 255, 0, 0, 255);
+            EXPECT_PIXEL_EQ(0, 1, 255, 0, 0, 255);
+        }
+        else
+        {
+            std::cout << "Skipping rendering to an unsupported framebuffer format" << std::endl;
+        }
 
         glDeleteFramebuffers(1, &fbo);
     }
@@ -127,7 +134,7 @@ TEST_P(SixteenBppTextureTest, RGB565Validation)
     // These tests fail on certain Intel machines running an un-updated version of Win7
     // The tests pass after installing the latest updates from Windows Update.
     // TODO: reenable these tests once the bots have been updated
-    if (isIntel() && getPlatformRenderer() == EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE)
+    if (IsIntel() && getPlatformRenderer() == EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE)
     {
         std::cout << "Test skipped on Intel D3D11." << std::endl;
         return;
@@ -168,7 +175,7 @@ TEST_P(SixteenBppTextureTest, RGBA5551Validation)
     // These tests fail on certain Intel machines running an un-updated version of Win7
     // The tests pass after installing the latest updates from Windows Update.
     // TODO: reenable these tests once the bots have been updated
-    if (isIntel() && getPlatformRenderer() == EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE)
+    if (IsIntel() && getPlatformRenderer() == EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE)
     {
         std::cout << "Test skipped on Intel D3D11." << std::endl;
         return;
@@ -206,7 +213,7 @@ TEST_P(SixteenBppTextureTest, RGBA5551ClearAlpha)
     // These tests fail on certain Intel machines running an un-updated version of Win7
     // The tests pass after installing the latest updates from Windows Update.
     // TODO: reenable these tests once the bots have been updated
-    if (isIntel() && getPlatformRenderer() == EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE)
+    if (IsIntel() && getPlatformRenderer() == EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE)
     {
         std::cout << "Test skipped on Intel D3D11." << std::endl;
         return;
@@ -229,13 +236,20 @@ TEST_P(SixteenBppTextureTest, RGBA5551ClearAlpha)
     glBindTexture(GL_TEXTURE_2D, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
 
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    EXPECT_PIXEL_EQ(0, 0, 0, 0, 0, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_UNSUPPORTED)
+    {
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        EXPECT_PIXEL_EQ(0, 0, 0, 0, 0, 0);
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    EXPECT_PIXEL_EQ(0, 0, 0, 0, 0, 255);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        EXPECT_PIXEL_EQ(0, 0, 0, 0, 0, 255);
+    }
+    else
+    {
+        std::cout << "Skipping rendering to an unsupported framebuffer format" << std::endl;
+    }
 
     glDeleteFramebuffers(1, &fbo);
     glDeleteTextures(1, &tex);
@@ -249,7 +263,7 @@ TEST_P(SixteenBppTextureTest, RGBA4444Validation)
     // These tests fail on certain Intel machines running an un-updated version of Win7
     // The tests pass after installing the latest updates from Windows Update.
     // TODO: reenable these tests once the bots have been updated
-    if (isIntel() && getPlatformRenderer() == EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE)
+    if (IsIntel() && getPlatformRenderer() == EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE)
     {
         std::cout << "Test skipped on Intel D3D11." << std::endl;
         return;
@@ -284,6 +298,11 @@ TEST_P(SixteenBppTextureTest, RGBA4444Validation)
 }
 
 // Use this to select which configurations (e.g. which renderer, which GLES major version) these tests should be run against.
-ANGLE_INSTANTIATE_TEST(SixteenBppTextureTest, ES2_D3D9(),  ES2_D3D11(), ES2_D3D11_FL9_3(), ES2_OPENGL());
+ANGLE_INSTANTIATE_TEST(SixteenBppTextureTest,
+                       ES2_D3D9(),
+                       ES2_D3D11(),
+                       ES2_D3D11_FL9_3(),
+                       ES2_OPENGL(),
+                       ES2_OPENGLES());
 
 } // namespace

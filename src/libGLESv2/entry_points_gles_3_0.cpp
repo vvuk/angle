@@ -35,13 +35,12 @@ void GL_APIENTRY ReadBuffer(GLenum mode)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!ValidateReadBuffer(context, mode))
+        if (!context->skipValidation() && !ValidateReadBuffer(context, mode))
         {
             return;
         }
 
-        Framebuffer *readFBO = context->getState().getReadFramebuffer();
-        readFBO->setReadBuffer(mode);
+        context->readBuffer(mode);
     }
 }
 
@@ -53,21 +52,11 @@ void GL_APIENTRY DrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsize
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        IndexRange indexRange;
+        if (!context->skipValidation() &&
+            !ValidateDrawRangeElements(context, mode, start, end, count, type, indices,
+                                       &indexRange))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        RangeUI indexRange;
-        if (!ValidateDrawElements(context, mode, count, type, indices, 0, &indexRange))
-        {
-            return;
-        }
-        if (indexRange.end > end || indexRange.start < start)
-        {
-            // GL spec says that behavior in this case is undefined - generating an error is fine.
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
@@ -75,7 +64,8 @@ void GL_APIENTRY DrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsize
         // a drawRangeElements call - the GL back-end is free to choose to call drawRangeElements based on the
         // validated index range. If index validation is removed, adding drawRangeElements to the context interface
         // should be reconsidered.
-        Error error = context->drawElements(mode, count, type, indices, 0, indexRange);
+        Error error =
+            context->drawRangeElements(mode, start, end, count, type, indices, indexRange);
         if (error.isError())
         {
             context->recordError(error);
@@ -94,28 +84,15 @@ void GL_APIENTRY TexImage3D(GLenum target, GLint level, GLint internalformat, GL
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
-        {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        // validateES3TexImageFormat sets the error code if there is an error
-        if (!ValidateES3TexImageParameters(context, target, level, internalformat, false, false,
-                                           0, 0, 0, width, height, depth, border, format, type, pixels))
+        if (!context->skipValidation() &&
+            !ValidateTexImage3D(context, target, level, internalformat, width, height, depth,
+                                border, format, type, pixels))
         {
             return;
         }
 
-        Extents size(width, height, depth);
-        Texture *texture = context->getTargetTexture(target);
-        Error error = texture->setImage(context, target, level, internalformat, size, format, type,
-                                        reinterpret_cast<const uint8_t *>(pixels));
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->texImage3D(target, level, internalformat, width, height, depth, border, format,
+                            type, pixels);
     }
 }
 
@@ -129,35 +106,15 @@ void GL_APIENTRY TexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint 
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
-        {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        // validateES3TexImageFormat sets the error code if there is an error
-        if (!ValidateES3TexImageParameters(context, target, level, GL_NONE, false, true,
-                                           xoffset, yoffset, zoffset, width, height, depth, 0,
-                                           format, type, pixels))
+        if (!context->skipValidation() &&
+            !ValidateTexSubImage3D(context, target, level, xoffset, yoffset, zoffset, width, height,
+                                   depth, format, type, pixels))
         {
             return;
         }
 
-        // Zero sized uploads are valid but no-ops
-        if (width == 0 || height == 0 || depth == 0)
-        {
-            return;
-        }
-
-        Box area(xoffset, yoffset, zoffset, width, height, depth);
-        Texture *texture = context->getTargetTexture(target);
-        Error error = texture->setSubImage(context, target, level, area, format, type,
-                                           reinterpret_cast<const uint8_t *>(pixels));
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->texSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth,
+                               format, type, pixels);
     }
 }
 
@@ -170,29 +127,14 @@ void GL_APIENTRY CopyTexSubImage3D(GLenum target, GLint level, GLint xoffset, GL
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
-        {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        if (!ValidateES3CopyTexImageParameters(context, target, level, GL_NONE, true, xoffset, yoffset, zoffset,
-                                               x, y, width, height, 0))
+        if (!context->skipValidation() &&
+            !ValidateCopyTexSubImage3D(context, target, level, xoffset, yoffset, zoffset, x, y,
+                                       width, height))
         {
             return;
         }
 
-        Offset destOffset(xoffset, yoffset, zoffset);
-        Rectangle sourceArea(x, y, width, height);
-
-        const Framebuffer *framebuffer = context->getState().getReadFramebuffer();
-        Texture *texture = context->getTargetTexture(target);
-        Error error = texture->copySubImage(target, level, destOffset, sourceArea, framebuffer);
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->copyTexSubImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
     }
 }
 
@@ -206,22 +148,15 @@ void GL_APIENTRY CompressedTexImage3D(GLenum target, GLint level, GLenum interna
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!gl::ValidateCompressedTexImage3D(context, target, level, internalformat, width, height,
-                                              depth, border, imageSize, data))
+        if (!context->skipValidation() &&
+            !ValidateCompressedTexImage3D(context, target, level, internalformat, width, height,
+                                          depth, border, imageSize, data))
         {
             return;
         }
 
-        Extents size(width, height, depth);
-        Texture *texture = context->getTargetTexture(target);
-        Error error =
-            texture->setCompressedImage(context, target, level, internalformat, size, imageSize,
-                                        reinterpret_cast<const uint8_t *>(data));
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->compressedTexImage3D(target, level, internalformat, width, height, depth, border,
+                                      imageSize, data);
     }
 }
 
@@ -235,48 +170,15 @@ void GL_APIENTRY CompressedTexSubImage3D(GLenum target, GLint level, GLint xoffs
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
-        {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        const InternalFormat &formatInfo = GetInternalFormatInfo(format);
-        if (imageSize < 0 || static_cast<GLuint>(imageSize) != formatInfo.computeBlockSize(GL_UNSIGNED_BYTE, width, height))
-        {
-            context->recordError(Error(GL_INVALID_VALUE));
-            return;
-        }
-
-        if (!data)
-        {
-            context->recordError(Error(GL_INVALID_VALUE));
-            return;
-        }
-
-        // validateES3TexImageFormat sets the error code if there is an error
-        if (!ValidateES3TexImageParameters(context, target, level, GL_NONE, true, true,
-                                           0, 0, 0, width, height, depth, 0, GL_NONE, GL_NONE, data))
+        if (!context->skipValidation() &&
+            !ValidateCompressedTexSubImage3D(context, target, level, xoffset, yoffset, zoffset,
+                                             width, height, depth, format, imageSize, data))
         {
             return;
         }
 
-        // Zero sized uploads are valid but no-ops
-        if (width == 0 || height == 0)
-        {
-            return;
-        }
-
-        Box area(xoffset, yoffset, zoffset, width, height, depth);
-        Texture *texture = context->getTargetTexture(target);
-        Error error =
-            texture->setCompressedSubImage(context, target, level, area, format, imageSize,
-                                           reinterpret_cast<const uint8_t *>(data));
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->compressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height,
+                                         depth, format, imageSize, data);
     }
 }
 
@@ -287,15 +189,8 @@ void GL_APIENTRY GenQueries(GLsizei n, GLuint* ids)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateGenQueries(context, n, ids))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        if (n < 0)
-        {
-            context->recordError(Error(GL_INVALID_VALUE));
             return;
         }
 
@@ -313,19 +208,12 @@ void GL_APIENTRY DeleteQueries(GLsizei n, const GLuint* ids)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateDeleteQueries(context, n, ids))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
-        if (n < 0)
-        {
-            context->recordError(Error(GL_INVALID_VALUE));
-            return;
-        }
-
-        for (GLsizei i = 0; i < n; i++)
+        for (int i = 0; i < n; i++)
         {
             context->deleteQuery(ids[i]);
         }
@@ -358,12 +246,6 @@ void GL_APIENTRY BeginQuery(GLenum target, GLuint id)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
-        {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
         if (!ValidateBeginQuery(context, target, id))
         {
             return;
@@ -385,12 +267,6 @@ void GL_APIENTRY EndQuery(GLenum target)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
-        {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
         if (!ValidateEndQuery(context, target))
         {
             return;
@@ -412,28 +288,12 @@ void GL_APIENTRY GetQueryiv(GLenum target, GLenum pname, GLint* params)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!ValidateGetQueryiv(context, target, pname, params))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
-        if (!ValidQueryType(context, target))
-        {
-            context->recordError(Error(GL_INVALID_ENUM));
-            return;
-        }
-
-        switch (pname)
-        {
-          case GL_CURRENT_QUERY:
-            params[0] = static_cast<GLint>(context->getState().getActiveQueryId(target));
-            break;
-
-          default:
-            context->recordError(Error(GL_INVALID_ENUM));
-            return;
-        }
+        context->getQueryiv(target, pname, params);
     }
 }
 
@@ -444,52 +304,15 @@ void GL_APIENTRY GetQueryObjectuiv(GLuint id, GLenum pname, GLuint* params)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!ValidateGetQueryObjectuiv(context, id, pname, params))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
-        Query *queryObject = context->getQuery(id, false, GL_NONE);
-
-        if (!queryObject)
+        Error error = context->getQueryObjectuiv(id, pname, params);
+        if (error.isError())
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        if (context->getState().getActiveQueryId(queryObject->getType()) == id)
-        {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        switch(pname)
-        {
-          case GL_QUERY_RESULT_EXT:
-            {
-                Error error = queryObject->getResult(params);
-                if (error.isError())
-                {
-                    context->recordError(error);
-                    return;
-                }
-            }
-            break;
-
-          case GL_QUERY_RESULT_AVAILABLE_EXT:
-            {
-                Error error = queryObject->isResultAvailable(params);
-                if (error.isError())
-                {
-                    context->recordError(error);
-                    return;
-                }
-            }
-            break;
-
-          default:
-            context->recordError(Error(GL_INVALID_ENUM));
+            context->recordError(error);
             return;
         }
     }
@@ -536,13 +359,12 @@ void GL_APIENTRY DrawBuffers(GLsizei n, const GLenum* bufs)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateDrawBuffers(context, n, bufs))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
-        DrawBuffersEXT(n, bufs);
+        context->drawBuffers(n, bufs);
     }
 }
 
@@ -663,34 +485,15 @@ void GL_APIENTRY BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint sr
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
-        {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        if (!ValidateBlitFramebufferParameters(context, srcX0, srcY0, srcX1, srcY1,
-                                               dstX0, dstY0, dstX1, dstY1, mask, filter,
-                                               false))
+        if (!context->skipValidation() &&
+            !ValidateBlitFramebuffer(context, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1,
+                                     dstY1, mask, filter))
         {
             return;
         }
 
-        Framebuffer *readFramebuffer = context->getState().getReadFramebuffer();
-        ASSERT(readFramebuffer);
-
-        Framebuffer *drawFramebuffer = context->getState().getDrawFramebuffer();
-        ASSERT(drawFramebuffer);
-
-        Rectangle srcArea(srcX0, srcY0, srcX1 - srcX0, srcY1 - srcY0);
-        Rectangle dstArea(dstX0, dstY0, dstX1 - dstX0, dstY1 - dstY0);
-
-        Error error = drawFramebuffer->blit(context->getState(), srcArea, dstArea, mask, filter, readFramebuffer);
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->blitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask,
+                                 filter);
     }
 }
 
@@ -726,37 +529,13 @@ void GL_APIENTRY FramebufferTextureLayer(GLenum target, GLenum attachment, GLuin
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!ValidateFramebufferTextureLayer(context, target, attachment, texture,
-                                             level, layer))
+        if (!context->skipValidation() &&
+            !ValidateFramebufferTextureLayer(context, target, attachment, texture, level, layer))
         {
             return;
         }
 
-        Framebuffer *framebuffer = context->getState().getTargetFramebuffer(target);
-        ASSERT(framebuffer);
-
-        if (texture != 0)
-        {
-            Texture *textureObject = context->getTexture(texture);
-
-            ImageIndex index = ImageIndex::MakeInvalid();
-
-            if (textureObject->getTarget() == GL_TEXTURE_3D)
-            {
-                index = ImageIndex::Make3D(level, layer);
-            }
-            else
-            {
-                ASSERT(textureObject->getTarget() == GL_TEXTURE_2D_ARRAY);
-                index = ImageIndex::Make2DArray(level, layer);
-            }
-
-            framebuffer->setAttachment(GL_TEXTURE, attachment, index, textureObject);
-        }
-        else
-        {
-            framebuffer->resetAttachment(attachment);
-        }
+        context->framebufferTextureLayer(target, attachment, texture, level, layer);
     }
 }
 
@@ -804,19 +583,8 @@ void GL_APIENTRY BindVertexArray(GLuint array)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!ValidateBindVertexArray(context, array))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        VertexArray *vao = context->getVertexArray(array);
-
-        if (!vao)
-        {
-            // The default VAO should always exist
-            ASSERT(array != 0);
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
@@ -831,15 +599,8 @@ void GL_APIENTRY DeleteVertexArrays(GLsizei n, const GLuint* arrays)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateDeleteVertexArrays(context, n, arrays))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        if (n < 0)
-        {
-            context->recordError(Error(GL_INVALID_VALUE));
             return;
         }
 
@@ -860,15 +621,8 @@ void GL_APIENTRY GenVertexArrays(GLsizei n, GLuint* arrays)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateGenVertexArrays(context, n, arrays))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        if (n < 0)
-        {
-            context->recordError(Error(GL_INVALID_VALUE));
             return;
         }
 
@@ -886,9 +640,8 @@ GLboolean GL_APIENTRY IsVertexArray(GLuint array)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!ValidateIsVertexArray(context))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return GL_FALSE;
         }
 
@@ -1246,13 +999,11 @@ void GL_APIENTRY TransformFeedbackVaryings(GLuint program, GLsizei count, const 
             return;
         }
 
-        if (!ValidProgram(context, program))
+        Program *programObject = GetValidProgram(context, program);
+        if (!programObject)
         {
             return;
         }
-
-        Program *programObject = context->getProgram(program);
-        ASSERT(programObject);
 
         programObject->setTransformFeedbackVaryings(count, varyings, bufferMode);
     }
@@ -1279,13 +1030,11 @@ void GL_APIENTRY GetTransformFeedbackVarying(GLuint program, GLuint index, GLsiz
             return;
         }
 
-        if (!ValidProgram(context, program))
+        Program *programObject = GetValidProgram(context, program);
+        if (!programObject)
         {
             return;
         }
-
-        Program *programObject = context->getProgram(program);
-        ASSERT(programObject);
 
         if (index >= static_cast<GLuint>(programObject->getTransformFeedbackVaryingCount()))
         {
@@ -1702,43 +1451,13 @@ void GL_APIENTRY ClearBufferiv(GLenum buffer, GLint drawbuffer, const GLint* val
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!ValidateClearBuffer(context))
+        if (!context->skipValidation() &&
+            !ValidateClearBufferiv(context, buffer, drawbuffer, value))
         {
             return;
         }
 
-        switch (buffer)
-        {
-          case GL_COLOR:
-            if (drawbuffer < 0 || static_cast<GLuint>(drawbuffer) >= context->getCaps().maxDrawBuffers)
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
-            break;
-
-          case GL_STENCIL:
-            if (drawbuffer != 0)
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
-            break;
-
-          default:
-            context->recordError(Error(GL_INVALID_ENUM));
-            return;
-        }
-
-        Framebuffer *framebufferObject = context->getState().getDrawFramebuffer();
-        ASSERT(framebufferObject);
-
-        Error error = framebufferObject->clearBufferiv(context, buffer, drawbuffer, value);
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->clearBufferiv(buffer, drawbuffer, value);
     }
 }
 
@@ -1750,35 +1469,13 @@ void GL_APIENTRY ClearBufferuiv(GLenum buffer, GLint drawbuffer, const GLuint* v
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!ValidateClearBuffer(context))
+        if (!context->skipValidation() &&
+            !ValidateClearBufferuiv(context, buffer, drawbuffer, value))
         {
             return;
         }
 
-        switch (buffer)
-        {
-          case GL_COLOR:
-            if (drawbuffer < 0 || static_cast<GLuint>(drawbuffer) >= context->getCaps().maxDrawBuffers)
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
-            break;
-
-          default:
-            context->recordError(Error(GL_INVALID_ENUM));
-            return;
-        }
-
-        Framebuffer *framebufferObject = context->getState().getDrawFramebuffer();
-        ASSERT(framebufferObject);
-
-        Error error = framebufferObject->clearBufferuiv(context, buffer, drawbuffer, value);
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->clearBufferuiv(buffer, drawbuffer, value);
     }
 }
 
@@ -1790,43 +1487,13 @@ void GL_APIENTRY ClearBufferfv(GLenum buffer, GLint drawbuffer, const GLfloat* v
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!ValidateClearBuffer(context))
+        if (!context->skipValidation() &&
+            !ValidateClearBufferfv(context, buffer, drawbuffer, value))
         {
             return;
         }
 
-        switch (buffer)
-        {
-          case GL_COLOR:
-            if (drawbuffer < 0 || static_cast<GLuint>(drawbuffer) >= context->getCaps().maxDrawBuffers)
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
-            break;
-
-          case GL_DEPTH:
-            if (drawbuffer != 0)
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
-            break;
-
-          default:
-            context->recordError(Error(GL_INVALID_ENUM));
-            return;
-        }
-
-        Framebuffer *framebufferObject = context->getState().getDrawFramebuffer();
-        ASSERT(framebufferObject);
-
-        Error error = framebufferObject->clearBufferfv(context, buffer, drawbuffer, value);
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->clearBufferfv(buffer, drawbuffer, value);
     }
 }
 
@@ -1838,41 +1505,13 @@ void GL_APIENTRY ClearBufferfi(GLenum buffer, GLint drawbuffer, GLfloat depth, G
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!ValidateClearBuffer(context))
+        if (!context->skipValidation() &&
+            !ValidateClearBufferfi(context, buffer, drawbuffer, depth, stencil))
         {
             return;
         }
 
-        switch (buffer)
-        {
-          case GL_DEPTH_STENCIL:
-            if (drawbuffer != 0)
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
-            break;
-
-          default:
-            context->recordError(Error(GL_INVALID_ENUM));
-            return;
-        }
-
-        Framebuffer *framebufferObject = context->getState().getDrawFramebuffer();
-        ASSERT(framebufferObject);
-
-        // If a buffer is not present, the clear has no effect
-        if (framebufferObject->getDepthbuffer() == nullptr && framebufferObject->getStencilbuffer() == nullptr)
-        {
-            return;
-        }
-
-        Error error = framebufferObject->clearBufferfi(context, buffer, drawbuffer, depth, stencil);
-        if (error.isError())
-        {
-            context->recordError(error);
-            return;
-        }
+        context->clearBufferfi(buffer, drawbuffer, depth, stencil);
     }
 }
 
@@ -1990,20 +1629,11 @@ void GL_APIENTRY GetUniformIndices(GLuint program, GLsizei uniformCount, const G
             return;
         }
 
-        Program *programObject = context->getProgram(program);
+        Program *programObject = GetValidProgram(context, program);
 
         if (!programObject)
         {
-            if (context->getShader(program))
-            {
-                context->recordError(Error(GL_INVALID_OPERATION));
-                return;
-            }
-            else
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
+            return;
         }
 
         if (!programObject->isLinked())
@@ -2043,20 +1673,11 @@ void GL_APIENTRY GetActiveUniformsiv(GLuint program, GLsizei uniformCount, const
             return;
         }
 
-        Program *programObject = context->getProgram(program);
+        Program *programObject = GetValidProgram(context, program);
 
         if (!programObject)
         {
-            if (context->getShader(program))
-            {
-                context->recordError(Error(GL_INVALID_OPERATION));
-                return;
-            }
-            else
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
+            return;
         }
 
         switch (pname)
@@ -2114,20 +1735,10 @@ GLuint GL_APIENTRY GetUniformBlockIndex(GLuint program, const GLchar* uniformBlo
             return GL_INVALID_INDEX;
         }
 
-        Program *programObject = context->getProgram(program);
-
+        Program *programObject = GetValidProgram(context, program);
         if (!programObject)
         {
-            if (context->getShader(program))
-            {
-                context->recordError(Error(GL_INVALID_OPERATION));
-                return GL_INVALID_INDEX;
-            }
-            else
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return GL_INVALID_INDEX;
-            }
+            return GL_INVALID_INDEX;
         }
 
         return programObject->getUniformBlockIndex(uniformBlockName);
@@ -2149,20 +1760,11 @@ void GL_APIENTRY GetActiveUniformBlockiv(GLuint program, GLuint uniformBlockInde
             context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
-        Program *programObject = context->getProgram(program);
+        Program *programObject = GetValidProgram(context, program);
 
         if (!programObject)
         {
-            if (context->getShader(program))
-            {
-                context->recordError(Error(GL_INVALID_OPERATION));
-                return;
-            }
-            else
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
+            return;
         }
 
         if (uniformBlockIndex >= programObject->getActiveUniformBlockCount())
@@ -2207,20 +1809,11 @@ void GL_APIENTRY GetActiveUniformBlockName(GLuint program, GLuint uniformBlockIn
             return;
         }
 
-        Program *programObject = context->getProgram(program);
+        Program *programObject = GetValidProgram(context, program);
 
         if (!programObject)
         {
-            if (context->getShader(program))
-            {
-                context->recordError(Error(GL_INVALID_OPERATION));
-                return;
-            }
-            else
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
+            return;
         }
 
         if (uniformBlockIndex >= programObject->getActiveUniformBlockCount())
@@ -2253,20 +1846,11 @@ void GL_APIENTRY UniformBlockBinding(GLuint program, GLuint uniformBlockIndex, G
             return;
         }
 
-        Program *programObject = context->getProgram(program);
+        Program *programObject = GetValidProgram(context, program);
 
         if (!programObject)
         {
-            if (context->getShader(program))
-            {
-                context->recordError(Error(GL_INVALID_OPERATION));
-                return;
-            }
-            else
-            {
-                context->recordError(Error(GL_INVALID_VALUE));
-                return;
-            }
+            return;
         }
 
         // if never linked, there won't be any uniform blocks
@@ -2299,7 +1883,7 @@ void GL_APIENTRY DrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GL
             return;
         }
 
-        Error error = context->drawArrays(mode, first, count, instanceCount);
+        Error error = context->drawArraysInstanced(mode, first, count, instanceCount);
         if (error.isError())
         {
             context->recordError(error);
@@ -2322,13 +1906,14 @@ void GL_APIENTRY DrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, 
             return;
         }
 
-        RangeUI indexRange;
+        IndexRange indexRange;
         if (!ValidateDrawElementsInstanced(context, mode, count, type, indices, instanceCount, &indexRange))
         {
             return;
         }
 
-        Error error = context->drawElements(mode, count, type, indices, instanceCount, indexRange);
+        Error error =
+            context->drawElementsInstanced(mode, count, type, indices, instanceCount, indexRange);
         if (error.isError())
         {
             context->recordError(error);
@@ -2732,15 +2317,8 @@ void GL_APIENTRY GenSamplers(GLsizei count, GLuint* samplers)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateGenSamplers(context, count, samplers))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        if (count < 0)
-        {
-            context->recordError(Error(GL_INVALID_VALUE));
             return;
         }
 
@@ -2758,15 +2336,8 @@ void GL_APIENTRY DeleteSamplers(GLsizei count, const GLuint* samplers)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateDeleteSamplers(context, count, samplers))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
-            return;
-        }
-
-        if (count < 0)
-        {
-            context->recordError(Error(GL_INVALID_VALUE));
             return;
         }
 
@@ -3006,9 +2577,11 @@ void GL_APIENTRY BindTransformFeedback(GLenum target, GLuint id)
                 }
 
                 // Cannot bind a transform feedback object that does not exist (3.0.2 pg 85 section 2.14.1)
-                if (context->getTransformFeedback(id) == NULL)
+                if (!context->isTransformFeedbackGenerated(id))
                 {
-                    context->recordError(Error(GL_INVALID_OPERATION));
+                    context->recordError(
+                        Error(GL_INVALID_OPERATION,
+                              "Cannot bind a transform feedback object that does not exist."));
                     return;
                 }
 
@@ -3030,9 +2603,8 @@ void GL_APIENTRY DeleteTransformFeedbacks(GLsizei n, const GLuint* ids)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateDeleteTransformFeedbacks(context, n, ids))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
@@ -3050,9 +2622,8 @@ void GL_APIENTRY GenTransformFeedbacks(GLsizei n, GLuint* ids)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!context->skipValidation() && !ValidateGenTransformFeedbacks(context, n, ids))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
@@ -3076,7 +2647,15 @@ GLboolean GL_APIENTRY IsTransformFeedback(GLuint id)
             return GL_FALSE;
         }
 
-        return ((context->getTransformFeedback(id) != NULL) ? GL_TRUE : GL_FALSE);
+        if (id == 0)
+        {
+            // The 3.0.4 spec [section 6.1.11] states that if ID is zero, IsTransformFeedback
+            // returns FALSE
+            return GL_FALSE;
+        }
+
+        const TransformFeedback *transformFeedback = context->getTransformFeedback(id);
+        return ((transformFeedback != nullptr) ? GL_TRUE : GL_FALSE);
     }
 
     return GL_FALSE;
@@ -3144,14 +2723,20 @@ void GL_APIENTRY GetProgramBinary(GLuint program, GLsizei bufSize, GLsizei* leng
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!ValidateGetProgramBinary(context, program, bufSize, length, binaryFormat, binary))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
-        // TODO: Pipe through to the OES extension for now, needs proper validation
-        return GetProgramBinaryOES(program, bufSize, length, binaryFormat, binary);
+        Program *programObject = context->getProgram(program);
+        ASSERT(programObject != nullptr);
+
+        Error error = programObject->saveBinary(binaryFormat, binary, bufSize, length);
+        if (error.isError())
+        {
+            context->recordError(error);
+            return;
+        }
     }
 }
 
@@ -3163,14 +2748,20 @@ void GL_APIENTRY ProgramBinary(GLuint program, GLenum binaryFormat, const GLvoid
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!ValidateProgramBinary(context, program, binaryFormat, binary, length))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
-        // TODO: Pipe through to the OES extension for now, needs proper validation
-        return ProgramBinaryOES(program, binaryFormat, binary, length);
+        Program *programObject = context->getProgram(program);
+        ASSERT(programObject != nullptr);
+
+        Error error = programObject->loadBinary(binaryFormat, binary, length);
+        if (error.isError())
+        {
+            context->recordError(error);
+            return;
+        }
     }
 }
 
@@ -3182,14 +2773,23 @@ void GL_APIENTRY ProgramParameteri(GLuint program, GLenum pname, GLint value)
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (context->getClientVersion() < 3)
+        if (!ValidateProgramParameter(context, program, pname, value))
         {
-            context->recordError(Error(GL_INVALID_OPERATION));
             return;
         }
 
-        // glProgramParameteri
-        UNIMPLEMENTED();
+        gl::Program *programObject = context->getProgram(program);
+        ASSERT(programObject != nullptr);
+
+        switch (pname)
+        {
+            case GL_PROGRAM_BINARY_RETRIEVABLE_HINT:
+                programObject->setBinaryRetrievableHint(value != GL_FALSE);
+                break;
+
+            default:
+                UNREACHABLE();
+        }
     }
 }
 
@@ -3201,23 +2801,13 @@ void GL_APIENTRY InvalidateFramebuffer(GLenum target, GLsizei numAttachments, co
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!ValidateInvalidateFramebuffer(context, target, numAttachments, attachments))
+        if (!context->skipValidation() &&
+            !ValidateInvalidateFramebuffer(context, target, numAttachments, attachments))
         {
             return;
         }
 
-        Framebuffer *framebuffer = context->getState().getTargetFramebuffer(target);
-        ASSERT(framebuffer);
-
-        if (framebuffer->checkStatus(context->getData()) == GL_FRAMEBUFFER_COMPLETE)
-        {
-            Error error = framebuffer->invalidate(numAttachments, attachments);
-            if (error.isError())
-            {
-                context->recordError(error);
-                return;
-            }
-        }
+        context->invalidateFramebuffer(target, numAttachments, attachments);
     }
 }
 
@@ -3230,24 +2820,13 @@ void GL_APIENTRY InvalidateSubFramebuffer(GLenum target, GLsizei numAttachments,
     Context *context = GetValidGlobalContext();
     if (context)
     {
-        if (!ValidateInvalidateFramebuffer(context, target, numAttachments, attachments))
+        if (!context->skipValidation() &&
+            !ValidateInvalidateFramebuffer(context, target, numAttachments, attachments))
         {
             return;
         }
 
-        Framebuffer *framebuffer = context->getState().getTargetFramebuffer(target);
-        ASSERT(framebuffer);
-
-        if (framebuffer->checkStatus(context->getData()) == GL_FRAMEBUFFER_COMPLETE)
-        {
-            Rectangle area(x, y, width, height);
-            Error error = framebuffer->invalidateSub(numAttachments, attachments, area);
-            if (error.isError())
-            {
-                context->recordError(error);
-                return;
-            }
-        }
+        context->invalidateSubFramebuffer(target, numAttachments, attachments, x, y, width, height);
     }
 }
 
@@ -3265,7 +2844,8 @@ void GL_APIENTRY TexStorage2D(GLenum target, GLsizei levels, GLenum internalform
             return;
         }
 
-        if (!ValidateES3TexStorageParameters(context, target, levels, internalformat, width, height, 1))
+        if (!ValidateES3TexStorage2DParameters(context, target, levels, internalformat, width,
+                                               height, 1))
         {
             return;
         }
@@ -3296,7 +2876,8 @@ void GL_APIENTRY TexStorage3D(GLenum target, GLsizei levels, GLenum internalform
             return;
         }
 
-        if (!ValidateES3TexStorageParameters(context, target, levels, internalformat, width, height, depth))
+        if (!ValidateES3TexStorage3DParameters(context, target, levels, internalformat, width,
+                                               height, depth))
         {
             return;
         }
