@@ -6,6 +6,10 @@
 
 #include "common/angleutils.h"
 
+namespace base {
+
+namespace {
+
 bool StartsWithASCII(const std::string& str,
                      const std::string& search,
                      bool case_sensitive) {
@@ -31,6 +35,10 @@ static inline bool DoLowerCaseEqualsASCII(Iter a_begin,
 bool LowerCaseEqualsASCII(const std::string& a, const char* b) {
   return DoLowerCaseEqualsASCII(a.begin(), a.end(), b);
 }
+
+} // anonymous namespace
+
+} // namespace base
 
 namespace gpu {
 
@@ -60,6 +68,7 @@ enum Token {
   kConfigMacMountainLion,
   kConfigMacMavericks,
   kConfigMacYosemite,
+  kConfigMacElCapitan,
   kConfigMac,
   kConfigLinux,
   kConfigChromeOS,
@@ -113,6 +122,7 @@ const TokenInfo kTokenData[] = {
     {"mountainlion", GPUTestConfig::kOsMacMountainLion},
     {"mavericks", GPUTestConfig::kOsMacMavericks},
     {"yosemite", GPUTestConfig::kOsMacYosemite},
+    {"elcapitan", GPUTestConfig::kOsMacElCapitan},
     {"mac", GPUTestConfig::kOsMac},
     {"linux", GPUTestConfig::kOsLinux},
     {"chromeos", GPUTestConfig::kOsChromeOS},
@@ -208,8 +218,8 @@ bool GPUTestExpectationsParser::LoadTestExpectations(const std::string& data) {
   entries_.clear();
   error_messages_.clear();
 
-  std::vector<std::string> lines;
-  base::SplitString(data, '\n', &lines);
+  std::vector<std::string> lines = base::SplitString(
+      data, "\n", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
   bool rt = true;
   for (size_t i = 0; i < lines.size(); ++i) {
     if (!ParseLine(lines[i], i + 1))
@@ -255,8 +265,9 @@ GPUTestExpectationsParser::GetErrorMessages() const {
 bool GPUTestExpectationsParser::ParseConfig(
     const std::string& config_data, GPUTestConfig* config) {
   DCHECK(config);
-  std::vector<std::string> tokens;
-  base::SplitStringAlongWhitespace(config_data, &tokens);
+  std::vector<std::string> tokens = base::SplitString(
+      config_data, base::kWhitespaceASCII, base::KEEP_WHITESPACE,
+      base::SPLIT_WANT_NONEMPTY);
 
   for (size_t i = 0; i < tokens.size(); ++i) {
     Token token = ParseToken(tokens[i]);
@@ -273,6 +284,7 @@ bool GPUTestExpectationsParser::ParseConfig(
       case kConfigMacMountainLion:
       case kConfigMacMavericks:
       case kConfigMacYosemite:
+      case kConfigMacElCapitan:
       case kConfigMac:
       case kConfigLinux:
       case kConfigChromeOS:
@@ -305,8 +317,9 @@ bool GPUTestExpectationsParser::ParseConfig(
 
 bool GPUTestExpectationsParser::ParseLine(
     const std::string& line_data, size_t line_number) {
-  std::vector<std::string> tokens;
-  base::SplitStringAlongWhitespace(line_data, &tokens);
+  std::vector<std::string> tokens = base::SplitString(
+      line_data, base::kWhitespaceASCII, base::KEEP_WHITESPACE,
+      base::SPLIT_WANT_NONEMPTY);
   int32 stage = kLineParserBegin;
   GPUTestExpectationEntry entry;
   entry.line_number = line_number;
@@ -330,6 +343,7 @@ bool GPUTestExpectationsParser::ParseLine(
       case kConfigMacMountainLion:
       case kConfigMacMavericks:
       case kConfigMacYosemite:
+      case kConfigMacElCapitan:
       case kConfigMac:
       case kConfigLinux:
       case kConfigChromeOS:
@@ -450,6 +464,7 @@ bool GPUTestExpectationsParser::UpdateTestConfig(
     case kConfigMacMountainLion:
     case kConfigMacMavericks:
     case kConfigMacYosemite:
+    case kConfigMacElCapitan:
     case kConfigMac:
     case kConfigLinux:
     case kConfigChromeOS:

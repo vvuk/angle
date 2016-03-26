@@ -31,10 +31,6 @@ struct DXGIFormat
 {
     DXGIFormat();
 
-    GLuint pixelBytes;
-    GLuint blockWidth;
-    GLuint blockHeight;
-
     GLuint redBits;
     GLuint greenBits;
     GLuint blueBits;
@@ -42,15 +38,9 @@ struct DXGIFormat
     GLuint sharedBits;
 
     GLuint depthBits;
-    GLuint depthOffset;
     GLuint stencilBits;
-    GLuint stencilOffset;
 
-    GLenum internalFormat;
     GLenum componentType;
-
-    MipGenerationFunction mipGenerationFunction;
-    ColorReadFunction colorReadFunction;
 
     FastCopyFunctionMap fastCopyFunctions;
 
@@ -58,28 +48,22 @@ struct DXGIFormat
 
     ColorCopyFunction getFastCopyFunction(GLenum format, GLenum type) const;
 };
+
+// This structure is problematic because a resource is associated with multiple DXGI formats.
+// For example, a texture might be stored as DXGI_FORMAT_R16_TYPELESS but store integer components,
+// which are accessed through an DXGI_FORMAT_R16_SINT view. It's easy to write code which queries
+// information about the wrong format. Therefore, use of this should be avoided where possible.
 const DXGIFormat &GetDXGIFormatInfo(DXGI_FORMAT format);
 
-struct TextureFormat
+struct DXGIFormatSize
 {
-    TextureFormat();
+    DXGIFormatSize(GLuint pixelBits, GLuint blockWidth, GLuint blockHeight);
 
-    DXGI_FORMAT texFormat;
-    DXGI_FORMAT srvFormat;
-    DXGI_FORMAT rtvFormat;
-    DXGI_FORMAT dsvFormat;
-    DXGI_FORMAT renderFormat;
-
-    DXGI_FORMAT swizzleTexFormat;
-    DXGI_FORMAT swizzleSRVFormat;
-    DXGI_FORMAT swizzleRTVFormat;
-
-    InitializeTextureDataFunction dataInitializerFunction;
-
-    typedef std::map<GLenum, LoadImageFunction> LoadFunctionMap;
-    LoadFunctionMap loadFunctions;
+    GLuint pixelBytes;
+    GLuint blockWidth;
+    GLuint blockHeight;
 };
-const TextureFormat &GetTextureFormatInfo(GLenum internalFormat, const Renderer11DeviceCaps &renderer11DeviceCaps);
+const DXGIFormatSize &GetDXGIFormatSizeInfo(DXGI_FORMAT format);
 
 struct VertexFormat
 {
@@ -92,10 +76,11 @@ struct VertexFormat
     DXGI_FORMAT nativeFormat;
     VertexCopyFunction copyFunction;
 };
-const VertexFormat &GetVertexFormatInfo(gl::VertexFormatType vertexFormatType, D3D_FEATURE_LEVEL featureLevel);
+const VertexFormat &GetVertexFormatInfo(gl::VertexFormatType vertexFormatType,
+                                        D3D_FEATURE_LEVEL featureLevel);
 
-}
+}  // namespace d3d11
 
-}
+}  // namespace rx
 
 #endif // LIBANGLE_RENDERER_D3D_D3D11_FORMATUTILS11_H_

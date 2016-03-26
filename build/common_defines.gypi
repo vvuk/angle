@@ -6,22 +6,28 @@
     'variables':
     {
         'component%': 'static_library',
+        'use_libpci%': 1,
         'windows_sdk_path%': 'C:/Program Files (x86)/Windows Kits/8.1',
         # build/gyp_angle sets this to 1.
         'angle_standalone%': '0',
 
         'angle_build_winrt%': '0',
         'angle_build_winphone%': '0',
-        'angle_build_winrt_app_type_revision%': '8.1',
         'conditions':
         [
-            ['OS=="linux" and use_x11==1 and chromeos==0', {
+            ['OS=="linux" and use_x11==1',
+            {
                 'angle_use_glx%': 1,
+                'angle_use_drm%': 0,
             },
             {
                 'angle_use_glx%': 0,
+                'angle_use_drm%': 1,
             }],
         ],
+
+        # root of the OSX SDK for Chromium builds, the system root for standalone builds
+        'SDKROOT%': "",
     },
     'msvs_disabled_warnings':
     [
@@ -35,6 +41,10 @@
     ],
     'conditions':
     [
+        ['chromeos==1',
+        {
+            'defines': [ 'USE_OZONE' ],
+        }],
         ['component=="shared_library"',
         {
             'defines': [ 'COMPONENT_BUILD' ],

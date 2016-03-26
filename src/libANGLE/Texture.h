@@ -15,6 +15,7 @@
 #include "angle_gl.h"
 #include "common/debug.h"
 #include "libANGLE/Caps.h"
+#include "libANGLE/Debug.h"
 #include "libANGLE/Constants.h"
 #include "libANGLE/Error.h"
 #include "libANGLE/FramebufferAttachment.h"
@@ -29,25 +30,82 @@ class Surface;
 
 namespace gl
 {
-class Context;
 class Framebuffer;
 struct Data;
 
-bool IsMipmapFiltered(const gl::SamplerState &samplerState);
+bool IsMipmapFiltered(const SamplerState &samplerState);
 
-class Texture final : public egl::ImageSibling
+class Texture final : public egl::ImageSibling,
+                      public FramebufferAttachmentObject,
+                      public LabeledObject
 {
   public:
     Texture(rx::TextureImpl *impl, GLuint id, GLenum target);
-    ~Texture();
+    ~Texture() override;
+
+    void setLabel(const std::string &label) override;
+    const std::string &getLabel() const override;
 
     GLenum getTarget() const;
 
-    const SamplerState &getSamplerState() const { return mSamplerState; }
-    SamplerState &getSamplerState() { return mSamplerState; }
+    void setSwizzleRed(GLenum swizzleRed);
+    GLenum getSwizzleRed() const;
+
+    void setSwizzleGreen(GLenum swizzleGreen);
+    GLenum getSwizzleGreen() const;
+
+    void setSwizzleBlue(GLenum swizzleBlue);
+    GLenum getSwizzleBlue() const;
+
+    void setSwizzleAlpha(GLenum swizzleAlpha);
+    GLenum getSwizzleAlpha() const;
+
+    void setMinFilter(GLenum minFilter);
+    GLenum getMinFilter() const;
+
+    void setMagFilter(GLenum magFilter);
+    GLenum getMagFilter() const;
+
+    void setWrapS(GLenum wrapS);
+    GLenum getWrapS() const;
+
+    void setWrapT(GLenum wrapT);
+    GLenum getWrapT() const;
+
+    void setWrapR(GLenum wrapR);
+    GLenum getWrapR() const;
+
+    void setMaxAnisotropy(float maxAnisotropy);
+    float getMaxAnisotropy() const;
+
+    void setMinLod(GLfloat minLod);
+    GLfloat getMinLod() const;
+
+    void setMaxLod(GLfloat maxLod);
+    GLfloat getMaxLod() const;
+
+    void setCompareMode(GLenum compareMode);
+    GLenum getCompareMode() const;
+
+    void setCompareFunc(GLenum compareFunc);
+    GLenum getCompareFunc() const;
+
+    const SamplerState &getSamplerState() const;
+
+    void setBaseLevel(GLuint baseLevel);
+    GLuint getBaseLevel() const;
+
+    void setMaxLevel(GLuint maxLevel);
+    GLuint getMaxLevel() const;
+
+    bool getImmutableFormat() const;
+
+    GLuint getImmutableLevels() const;
 
     void setUsage(GLenum usage);
     GLenum getUsage() const;
+
+    const TextureState &getTextureState() const;
 
     size_t getWidth(GLenum target, size_t level) const;
     size_t getHeight(GLenum target, size_t level) const;
@@ -59,7 +117,7 @@ class Texture final : public egl::ImageSibling
     bool isCubeComplete() const;
     size_t getMipCompleteLevels() const;
 
-    Error setImage(Context *context,
+    Error setImage(const PixelUnpackState &unpackState,
                    GLenum target,
                    size_t level,
                    GLenum internalFormat,
@@ -67,7 +125,7 @@ class Texture final : public egl::ImageSibling
                    GLenum format,
                    GLenum type,
                    const uint8_t *pixels);
-    Error setSubImage(Context *context,
+    Error setSubImage(const PixelUnpackState &unpackState,
                       GLenum target,
                       size_t level,
                       const Box &area,
@@ -75,14 +133,14 @@ class Texture final : public egl::ImageSibling
                       GLenum type,
                       const uint8_t *pixels);
 
-    Error setCompressedImage(Context *context,
+    Error setCompressedImage(const PixelUnpackState &unpackState,
                              GLenum target,
                              size_t level,
                              GLenum internalFormat,
                              const Extents &size,
                              size_t imageSize,
                              const uint8_t *pixels);
-    Error setCompressedSubImage(Context *context,
+    Error setCompressedSubImage(const PixelUnpackState &unpackState,
                                 GLenum target,
                                 size_t level,
                                 const Box &area,
@@ -107,19 +165,19 @@ class Texture final : public egl::ImageSibling
 
     Error generateMipmaps();
 
-    bool isImmutable() const;
-    GLsizei immutableLevelCount();
-
     egl::Surface *getBoundSurface() const;
 
     rx::TextureImpl *getImplementation() { return mTexture; }
     const rx::TextureImpl *getImplementation() const { return mTexture; }
 
     // FramebufferAttachmentObject implementation
-    GLsizei getAttachmentWidth(const FramebufferAttachment::Target &target) const override;
-    GLsizei getAttachmentHeight(const FramebufferAttachment::Target &target) const override;
+    Extents getAttachmentSize(const FramebufferAttachment::Target &target) const override;
     GLenum getAttachmentInternalFormat(const FramebufferAttachment::Target &target) const override;
     GLsizei getAttachmentSamples(const FramebufferAttachment::Target &target) const override;
+
+    void onAttach() override;
+    void onDetach() override;
+    GLuint getId() const override;
 
   private:
     rx::FramebufferAttachmentObjectImpl *getAttachmentImpl() const override { return mTexture; }
@@ -131,10 +189,9 @@ class Texture final : public egl::ImageSibling
 
     rx::TextureImpl *mTexture;
 
-    SamplerState mSamplerState;
-    GLenum mUsage;
+    std::string mLabel;
 
-    GLsizei mImmutableLevelCount;
+    TextureState mTextureState;
 
     GLenum mTarget;
 
@@ -150,8 +207,8 @@ class Texture final : public egl::ImageSibling
     GLenum getBaseImageTarget() const;
 
     bool computeSamplerCompleteness(const SamplerState &samplerState, const Data &data) const;
-    bool computeMipmapCompleteness(const gl::SamplerState &samplerState) const;
-    bool computeLevelCompleteness(GLenum target, size_t level, const gl::SamplerState &samplerState) const;
+    bool computeMipmapCompleteness() const;
+    bool computeLevelCompleteness(GLenum target, size_t level) const;
 
     const ImageDesc &getImageDesc(GLenum target, size_t level) const;
     void setImageDesc(GLenum target, size_t level, const ImageDesc &desc);

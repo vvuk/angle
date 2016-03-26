@@ -7,31 +7,66 @@
 //   dEQP and GoogleTest integration logic. Calls through to the random
 //   order executor.
 
+#include <fstream>
 #include <stdint.h>
-#include <zlib.h>
 
 #include <gtest/gtest.h>
 
 #include "angle_deqp_libtester.h"
 #include "common/angleutils.h"
 #include "common/debug.h"
+#include "common/Optional.h"
+#include "common/string_utils.h"
 #include "gpu_test_expectations_parser.h"
 #include "system_utils.h"
 
 namespace
 {
 
-const char *g_CaseListFiles[] =
-{
-    "dEQP-GLES2-cases.txt.gz",
-    "dEQP-GLES3-cases.txt.gz",
+const char *g_CaseListRelativePath = "/../../third_party/deqp/src/android/cts/master/";
+
+const char *g_TestExpectationsSearchPaths[] = {
+    "/../../src/tests/deqp_support/", "/../../third_party/angle/src/tests/deqp_support/",
+    "/deqp_support/",
+};
+
+const char *g_CaseListFiles[] = {
+    "gles2-master.txt", "gles3-master.txt", "egl-master.txt",
 };
 
 const char *g_TestExpectationsFiles[] =
 {
     "deqp_gles2_test_expectations.txt",
     "deqp_gles3_test_expectations.txt",
+    "deqp_egl_test_expectations.txt",
 };
+
+// During the CaseList initialization we cannot use the GTEST FAIL macro to quit the program because
+// the initialization is called outside of tests the first time.
+void Die()
+{
+    exit(EXIT_FAILURE);
+}
+
+Optional<std::string> FindTestExpectationsPath(const std::string &exeDir,
+                                                      size_t testModuleIndex)
+{
+    for (const char *testPath : g_TestExpectationsSearchPaths)
+    {
+        std::stringstream testExpectationsPathStr;
+        testExpectationsPathStr << exeDir << testPath << g_TestExpectationsFiles[testModuleIndex];
+
+        std::string path = testExpectationsPathStr.str();
+        std::ifstream inFile(path.c_str());
+        if (!inFile.fail())
+        {
+            inFile.close();
+            return Optional<std::string>(path);
+        }
+    }
+
+    return Optional<std::string>::Invalid();
+}
 
 class dEQPCaseList
 {
@@ -95,15 +130,17 @@ void dEQPCaseList::initialize()
     std::string exeDir = angle::GetExecutableDirectory();
 
     std::stringstream caseListPathStr;
-    caseListPathStr << exeDir << "/deqp_support/" << g_CaseListFiles[mTestModuleIndex];
+    caseListPathStr << exeDir << g_CaseListRelativePath << g_CaseListFiles[mTestModuleIndex];
     std::string caseListPath = caseListPathStr.str();
 
-    std::stringstream testExpectationsPathStr;
-    testExpectationsPathStr << exeDir << "/deqp_support/"
-                            << g_TestExpectationsFiles[mTestModuleIndex];
-    std::string testExpectationsPath = testExpectationsPathStr.str();
+    Optional<std::string> testExpectationsPath = FindTestExpectationsPath(exeDir, mTestModuleIndex);
+    if (!testExpectationsPath.valid())
+    {
+        std::cerr << "Failed to find test expectations file." << std::endl;
+        Die();
+    }
 
-    if (!mTestExpectationsParser.LoadTestExpectationsFromFile(testExpectationsPath))
+    if (!mTestExpectationsParser.LoadTestExpectationsFromFile(testExpectationsPath.value()))
     {
         std::stringstream errorMsgStream;
         for (const auto &message : mTestExpectationsParser.GetErrorMessages())
@@ -111,52 +148,43 @@ void dEQPCaseList::initialize()
             errorMsgStream << std::endl << " " << message;
         }
 
-        FAIL() << "Failed to load test expectations." << errorMsgStream.str();
+        std::cerr << "Failed to load test expectations." << errorMsgStream.str() << std::endl;
+        Die();
     }
 
     if (!mTestConfig.LoadCurrentConfig(nullptr))
     {
-        FAIL() << "Failed to load test configuration.";
+        std::cerr << "Failed to load test configuration." << std::endl;
+        Die();
     }
 
-    std::stringstream caseListStream;
-
-    std::vector<char> buf(1024 * 1024 * 16);
-    gzFile *fi = static_cast<gzFile *>(gzopen(caseListPath.c_str(), "rb"));
-
-    if (fi == nullptr)
+    std::ifstream caseListStream(caseListPath);
+    if (caseListStream.fail())
     {
-        FAIL() << "Failed to read gzipped test information.";
+        std::cerr << "Failed to load the case list." << std::endl;
+        Die();
     }
-
-    gzrewind(fi);
-    while (!gzeof(fi))
-    {
-        int len = gzread(fi, &buf[0], static_cast<unsigned int>(buf.size()) - 1);
-        buf[len] = '\0';
-        caseListStream << &buf[0];
-    }
-    gzclose(fi);
 
     while (!caseListStream.eof())
     {
         std::string inString;
         std::getline(caseListStream, inString);
 
-        if (inString.substr(0, 4) == "TEST")
+        std::string dEQPName = angle::TrimString(inString, angle::kWhitespaceASCII);
+        if (dEQPName.empty())
+            continue;
+        std::string gTestName = dEQPName.substr(dEQPName.find('.') + 1);
+        if (gTestName.empty())
+            continue;
+        std::replace(gTestName.begin(), gTestName.end(), '.', '_');
+
+        // Occurs in some luminance tests
+        gTestName.erase(std::remove(gTestName.begin(), gTestName.end(), '-'), gTestName.end());
+
+        int expectation = mTestExpectationsParser.GetTestExpectation(dEQPName, mTestConfig);
+        if (expectation != gpu::GPUTestExpectationsParser::kGpuTestSkip)
         {
-            std::string dEQPName = inString.substr(6);
-            std::string gTestName = dEQPName.substr(11);
-            std::replace(gTestName.begin(), gTestName.end(), '.', '_');
-
-            // Occurs in some luminance tests
-            gTestName.erase(std::remove(gTestName.begin(), gTestName.end(), '-'), gTestName.end());
-
-            int expectation = mTestExpectationsParser.GetTestExpectation(dEQPName, mTestConfig);
-            if (expectation != gpu::GPUTestExpectationsParser::kGpuTestSkip)
-            {
-                mCaseInfoList.push_back(CaseInfo(dEQPName, gTestName, expectation));
-            }
+            mCaseInfoList.push_back(CaseInfo(dEQPName, gTestName, expectation));
         }
     }
 }
@@ -168,6 +196,12 @@ class dEQPTest : public testing::TestWithParam<size_t>
     static testing::internal::ParamGenerator<size_t> GetTestingRange()
     {
         return testing::Range<size_t>(0, GetCaseList().numCases());
+    }
+
+    static std::string GetCaseGTestName(size_t caseIndex)
+    {
+        const auto &caseInfo = GetCaseList().getCaseInfo(caseIndex);
+        return caseInfo.mGTestName;
     }
 
     static const dEQPCaseList &GetCaseList()
@@ -204,23 +238,30 @@ class dEQP_GLES3 : public dEQPTest<1>
 {
 };
 
-#ifdef ANGLE_DEQP_GLES2_TESTS
-// TODO(jmadill): add different platform configs, or ability to choose platform
-TEST_P(dEQP_GLES2, Default)
+class dEQP_EGL : public dEQPTest<2>
 {
-    runTest();
-}
+};
 
-INSTANTIATE_TEST_CASE_P(, dEQP_GLES2, dEQP_GLES2::GetTestingRange());
+// TODO(jmadill): add different platform configs, or ability to choose platform
+#define ANGLE_INSTANTIATE_DEQP_TEST_CASE(DEQP_TEST)                             \
+    TEST_P(DEQP_TEST, Default) { runTest(); }                                   \
+                                                                                \
+    INSTANTIATE_TEST_CASE_P(, DEQP_TEST, DEQP_TEST::GetTestingRange(),          \
+                            [](const testing::TestParamInfo<size_t> &info)      \
+                            {                                                   \
+                                return DEQP_TEST::GetCaseGTestName(info.param); \
+                            })
+
+#ifdef ANGLE_DEQP_GLES2_TESTS
+ANGLE_INSTANTIATE_DEQP_TEST_CASE(dEQP_GLES2);
 #endif
 
 #ifdef ANGLE_DEQP_GLES3_TESTS
-TEST_P(dEQP_GLES3, Default)
-{
-    runTest();
-}
+ANGLE_INSTANTIATE_DEQP_TEST_CASE(dEQP_GLES3);
+#endif
 
-INSTANTIATE_TEST_CASE_P(, dEQP_GLES3, dEQP_GLES3::GetTestingRange());
+#ifdef ANGLE_DEQP_EGL_TESTS
+ANGLE_INSTANTIATE_DEQP_TEST_CASE(dEQP_EGL);
 #endif
 
 } // anonymous namespace

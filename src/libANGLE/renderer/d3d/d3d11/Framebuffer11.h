@@ -10,6 +10,7 @@
 #define LIBANGLE_RENDERER_D3D_D3D11_FRAMBUFFER11_H_
 
 #include "libANGLE/renderer/d3d/FramebufferD3D.h"
+#include "libANGLE/renderer/d3d/d3d11/renderer11_utils.h"
 
 namespace rx
 {
@@ -28,11 +29,33 @@ class Framebuffer11 : public FramebufferD3D
     // Invalidate the cached swizzles of all bound texture attachments.
     gl::Error invalidateSwizzles() const;
 
-  private:
-    gl::Error clear(const gl::State &state, const ClearParameters &clearParams) override;
+    void syncState(const gl::Framebuffer::DirtyBits &dirtyBits) override;
 
-    gl::Error readPixels(const gl::Rectangle &area, GLenum format, GLenum type, size_t outputPitch,
-                         const gl::PixelPackState &pack, uint8_t *pixels) const override;
+    const RenderTargetArray &getCachedColorRenderTargets() const
+    {
+        return mCachedColorRenderTargets;
+    }
+    const RenderTarget11 *getCachedDepthStencilRenderTarget() const
+    {
+        return mCachedDepthStencilRenderTarget;
+    }
+
+    void markColorRenderTargetDirty(size_t colorIndex);
+    void markDepthStencilRenderTargetDirty();
+
+    bool hasAnyInternalDirtyBit() const;
+    // TODO(jmadill): make this non-const
+    void syncInternalState() const;
+
+  private:
+    gl::Error clear(const gl::Data &data, const ClearParameters &clearParams) override;
+
+    gl::Error readPixelsImpl(const gl::Rectangle &area,
+                             GLenum format,
+                             GLenum type,
+                             size_t outputPitch,
+                             const gl::PixelPackState &pack,
+                             uint8_t *pixels) const override;
 
     gl::Error blit(const gl::Rectangle &sourceArea, const gl::Rectangle &destArea, const gl::Rectangle *scissor,
                    bool blitRenderTarget, bool blitDepth, bool blitStencil, GLenum filter,
@@ -42,7 +65,17 @@ class Framebuffer11 : public FramebufferD3D
 
     GLenum getRenderTargetImplementationFormat(RenderTargetD3D *renderTarget) const override;
 
+    void updateColorRenderTarget(size_t colorIndex);
+    void updateDepthStencilRenderTarget();
+
     Renderer11 *const mRenderer;
+    RenderTargetArray mCachedColorRenderTargets;
+    RenderTarget11 *mCachedDepthStencilRenderTarget;
+
+    std::vector<NotificationCallback> mColorRenderTargetsDirty;
+    NotificationCallback mDepthStencilRenderTargetDirty;
+
+    gl::Framebuffer::DirtyBits mInternalDirtyBits;
 };
 
 }

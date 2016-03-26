@@ -50,7 +50,15 @@ GLenum LayerIndexToCubeMapTextureTarget(size_t index);
 // set to GL_INVALID_INDEX if the provided name is not an array or the array index is invalid.
 std::string ParseUniformName(const std::string &name, size_t *outSubscript);
 
-RangeUI ComputeIndexRange(GLenum indexType, const GLvoid *indices, GLsizei count);
+// Find the range of index values in the provided indices pointer.  Primitive restart indices are
+// only counted in the range if primitive restart is disabled.
+IndexRange ComputeIndexRange(GLenum indexType,
+                             const GLvoid *indices,
+                             size_t count,
+                             bool primitiveRestartEnabled);
+
+// Get the primitive restart index value for the given index type.
+GLuint GetPrimitiveRestartIndex(GLenum indexType);
 
 bool IsTriangleMode(GLenum drawMode);
 
@@ -60,7 +68,9 @@ bool IsTriangleMode(GLenum drawMode);
 template <typename outT> outT iround(GLfloat value) { return static_cast<outT>(value > 0.0f ? floor(value + 0.5f) : ceil(value - 0.5f)); }
 template <typename outT> outT uiround(GLfloat value) { return static_cast<outT>(value + 0.5f); }
 
-}
+unsigned int ParseAndStripArrayIndex(std::string *name);
+
+}  // namespace gl
 
 namespace egl
 {

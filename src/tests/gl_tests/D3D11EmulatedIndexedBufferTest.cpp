@@ -43,7 +43,7 @@ class D3D11EmulatedIndexedBufferTest : public ANGLETest
 
         GLubyte indices[] = {0, 0, 3, 4, 2, 1, 1};
 
-        for (size_t i = 0; i < _countof(indices); i++)
+        for (size_t i = 0; i < ArraySize(indices); i++)
         {
             mExpectedExpandedData.push_back(testData[indices[i]]);
             mubyteIndices.push_back(indices[i]);
@@ -55,7 +55,7 @@ class D3D11EmulatedIndexedBufferTest : public ANGLETest
     void TearDown() override
     {
         SafeDelete(mSourceBuffer);
-         ANGLETest::TearDown();
+        ANGLETest::TearDown();
     }
 
     void createMappableCompareBufferFromEmulatedBuffer(ID3D11Buffer *sourceBuffer, GLuint size, ID3D11Buffer **mappableBuffer)

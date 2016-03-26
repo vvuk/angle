@@ -32,6 +32,16 @@ struct IndexConversionPerfParams final : public RenderTestParams
     unsigned int numIndexTris;
 };
 
+// Provide a custom gtest parameter name function for IndexConversionPerfParams
+// that includes the number of iterations and triangles in the test parameter name.
+// This also fixes the resolution of the overloaded operator<< on MSVC.
+std::ostream &operator<<(std::ostream &stream, const IndexConversionPerfParams &param)
+{
+    const PlatformParameters &platform = param;
+    stream << platform << "_" << param.iterations << "_" << param.numIndexTris;
+    return stream;
+}
+
 class IndexConversionPerfTest : public ANGLERenderTest,
                                 public ::testing::WithParamInterface<IndexConversionPerfParams>
 {
@@ -40,7 +50,6 @@ class IndexConversionPerfTest : public ANGLERenderTest,
 
     void initializeBenchmark() override;
     void destroyBenchmark() override;
-    void beginDrawBenchmark() override;
     void drawBenchmark() override;
 
     void updateBufferData();
@@ -65,10 +74,8 @@ void IndexConversionPerfTest::initializeBenchmark()
 {
     const auto &params = GetParam();
 
-    ASSERT_TRUE(params.iterations > 0);
-    ASSERT_TRUE(params.numIndexTris > 0);
-
-    mDrawIterations = params.iterations;
+    ASSERT_LT(0u, params.iterations);
+    ASSERT_LT(0u, params.numIndexTris);
 
     const std::string vs = SHADER_SOURCE
     (
@@ -91,7 +98,7 @@ void IndexConversionPerfTest::initializeBenchmark()
     );
 
     mProgram = CompileProgram(vs, fs);
-    ASSERT_TRUE(mProgram != 0);
+    ASSERT_NE(0u, mProgram);
 
     // Use the program object
     glUseProgram(mProgram);
@@ -140,7 +147,7 @@ void IndexConversionPerfTest::initializeBenchmark()
     glUniform1f(glGetUniformLocation(mProgram, "uScale"), scale);
     glUniform1f(glGetUniformLocation(mProgram, "uOffset"), offset);
 
-    ASSERT_TRUE(glGetError() == GL_NO_ERROR);
+    ASSERT_GL_NO_ERROR();
 }
 
 void IndexConversionPerfTest::updateBufferData()
@@ -155,14 +162,10 @@ void IndexConversionPerfTest::destroyBenchmark()
     glDeleteBuffers(1, &mIndexBuffer);
 }
 
-void IndexConversionPerfTest::beginDrawBenchmark()
-{
-    // Clear the color buffer
-    glClear(GL_COLOR_BUFFER_BIT);
-}
-
 void IndexConversionPerfTest::drawBenchmark()
 {
+    glClear(GL_COLOR_BUFFER_BIT);
+
     const auto &params = GetParam();
 
     // Trigger an update to ensure we convert once a frame
@@ -176,7 +179,7 @@ void IndexConversionPerfTest::drawBenchmark()
                        reinterpret_cast<GLvoid*>(0));
     }
 
-    EXPECT_TRUE(glGetError() == GL_NO_ERROR);
+    ASSERT_GL_NO_ERROR();
 }
 
 IndexConversionPerfParams IndexConversionPerfD3D11Params()
@@ -187,7 +190,7 @@ IndexConversionPerfParams IndexConversionPerfD3D11Params()
     params.minorVersion = 0;
     params.windowWidth = 256;
     params.windowHeight = 256;
-    params.iterations = 15;
+    params.iterations    = 225;
     params.numIndexTris = 3000;
     return params;
 }

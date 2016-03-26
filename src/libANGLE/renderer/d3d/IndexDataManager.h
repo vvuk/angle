@@ -36,18 +36,6 @@ class IndexBuffer;
 class BufferD3D;
 class RendererD3D;
 
-struct TranslatedIndexData
-{
-    gl::RangeUI indexRange;
-    unsigned int startIndex;
-    unsigned int startOffset;   // In bytes
-
-    IndexBuffer *indexBuffer;
-    BufferD3D *storage;
-    GLenum indexType;
-    unsigned int serial;
-};
-
 struct SourceIndexData
 {
     BufferD3D *srcBuffer;
@@ -57,19 +45,40 @@ struct SourceIndexData
     bool srcIndicesChanged;
 };
 
+struct TranslatedIndexData
+{
+    gl::IndexRange indexRange;
+    unsigned int startIndex;
+    unsigned int startOffset;   // In bytes
+
+    IndexBuffer *indexBuffer;
+    BufferD3D *storage;
+    GLenum indexType;
+    unsigned int serial;
+
+    SourceIndexData srcIndexData;
+};
+
 class IndexDataManager : angle::NonCopyable
 {
   public:
     explicit IndexDataManager(BufferFactoryD3D *factory, RendererClass rendererClass);
     virtual ~IndexDataManager();
 
-    gl::Error prepareIndexData(GLenum srcType, GLsizei count, gl::Buffer *glBuffer,
-                               const GLvoid *indices, TranslatedIndexData *translated,
-                               SourceIndexData *sourceData);
+    gl::Error prepareIndexData(GLenum srcType,
+                               GLsizei count,
+                               gl::Buffer *glBuffer,
+                               const GLvoid *indices,
+                               TranslatedIndexData *translated,
+                               bool primitiveRestartFixedIndexEnabled);
 
   private:
-    gl::Error streamIndexData(const GLvoid *data, unsigned int count, GLenum srcType,
-                              GLenum dstType, TranslatedIndexData *translated);
+    gl::Error streamIndexData(const GLvoid *data,
+                              unsigned int count,
+                              GLenum srcType,
+                              GLenum dstType,
+                              bool usePrimitiveRestartFixedIndex,
+                              TranslatedIndexData *translated);
     gl::Error getStreamingIndexBuffer(GLenum destinationIndexType,
                                       IndexBufferInterface **outBuffer);
 

@@ -34,8 +34,9 @@ static void PrintVariable(const std::string &prefix, size_t index, const sh::Sha
 static void PrintActiveVariables(ShHandle compiler);
 
 // If NUM_SOURCE_STRINGS is set to a value > 1, the input file data is
-// broken into that many chunks.
-const unsigned int NUM_SOURCE_STRINGS = 2;
+// broken into that many chunks. This will affect file/line numbering in
+// the preprocessor.
+const unsigned int NUM_SOURCE_STRINGS = 1;
 typedef std::vector<char *> ShaderSource;
 static bool ReadShaderSource(const char *fileName, ShaderSource &source);
 static void FreeShaderSource(ShaderSource &source);
@@ -145,11 +146,11 @@ int main(int argc, char *argv[])
                       case 'h':
                         if (argv[0][4] == '1' && argv[0][5] == '1')
                         {
-                            output = SH_HLSL11_OUTPUT;
+                            output = SH_HLSL_4_1_OUTPUT;
                         }
                         else
                         {
-                            output = SH_HLSL9_OUTPUT;
+                            output = SH_HLSL_3_0_OUTPUT;
                         }
                         break;
                       default: failCode = EFailUsage;
@@ -163,6 +164,7 @@ int main(int argc, char *argv[])
               case 'x':
                 if (argv[0][2] == '=')
                 {
+                    // clang-format off
                     switch (argv[0][3])
                     {
                       case 'i': resources.OES_EGL_image_external = 1; break;
@@ -190,15 +192,14 @@ int main(int argc, char *argv[])
                               failCode = EFailUsage;
                           }
                           break;
-                      case 'g':
-                          resources.EXT_frag_depth = 1;
-                          break;
+                      case 'g': resources.EXT_frag_depth = 1; break;
                       case 'l': resources.EXT_shader_texture_lod = 1; break;
                       case 'f': resources.EXT_shader_framebuffer_fetch = 1; break;
                       case 'n': resources.NV_shader_framebuffer_fetch = 1; break;
                       case 'a': resources.ARM_shader_framebuffer_fetch = 1; break;
                       default: failCode = EFailUsage;
                     }
+                    // clang-format on
                 }
                 else
                 {
@@ -286,6 +287,7 @@ int main(int argc, char *argv[])
 //
 void usage()
 {
+    // clang-format off
     printf(
         "Usage: translate [-i -o -u -l -e -t -d -p -b=e -b=g -b=h9 -x=i -x=d] file1 file2 ...\n"
         "Where: filename : filename ending in .frag or .vert\n"
@@ -313,10 +315,12 @@ void usage()
         "       -x=r     : enable ARB_texture_rectangle\n"
         "       -x=b[NUM]: enable EXT_blend_func_extended (NUM default 1)\n"
         "       -x=w[NUM]: enable EXT_draw_buffers (NUM default 1)\n"
+        "       -x=g     : enable EXT_frag_depth\n"
         "       -x=l     : enable EXT_shader_texture_lod\n"
         "       -x=f     : enable EXT_shader_framebuffer_fetch\n"
         "       -x=n     : enable NV_shader_framebuffer_fetch\n"
         "       -x=a     : enable ARM_shader_framebuffer_fetch\n");
+    // clang-format on
 }
 
 //
@@ -401,8 +405,8 @@ void PrintVariable(const std::string &prefix, size_t index, const sh::ShaderVari
       default: typeName = "UNKNOWN"; break;
     }
 
-    printf("%s %lu : name=%s, type=%s, arraySize=%u\n",
-           prefix.c_str(), index, var.name.c_str(), typeName.c_str(), var.arraySize);
+    printf("%s %u : name=%s, type=%s, arraySize=%u\n", prefix.c_str(),
+           static_cast<unsigned int>(index), var.name.c_str(), typeName.c_str(), var.arraySize);
     if (var.fields.size())
     {
         std::string structPrefix;
@@ -420,7 +424,7 @@ static void PrintActiveVariables(ShHandle compiler)
     const std::vector<sh::Uniform> *uniforms = ShGetUniforms(compiler);
     const std::vector<sh::Varying> *varyings = ShGetVaryings(compiler);
     const std::vector<sh::Attribute> *attributes = ShGetAttributes(compiler);
-    const std::vector<sh::Attribute> *outputs = ShGetOutputVariables(compiler);
+    const std::vector<sh::OutputVariable> *outputs = ShGetOutputVariables(compiler);
     for (size_t varCategory = 0; varCategory < 4; ++varCategory)
     {
         size_t numVars = 0;

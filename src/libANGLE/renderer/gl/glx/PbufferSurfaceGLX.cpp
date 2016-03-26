@@ -9,14 +9,20 @@
 #include "libANGLE/renderer/gl/glx/PbufferSurfaceGLX.h"
 
 #include "common/debug.h"
+#include "libANGLE/renderer/gl/glx/DisplayGLX.h"
 #include "libANGLE/renderer/gl/glx/FunctionsGLX.h"
 
 namespace rx
 {
 
-PbufferSurfaceGLX::PbufferSurfaceGLX(EGLint width, EGLint height, bool largest, const FunctionsGLX &glx,
-                                     glx::Context context, glx::FBConfig fbConfig)
-    : SurfaceGL(),
+PbufferSurfaceGLX::PbufferSurfaceGLX(RendererGL *renderer,
+                                     EGLint width,
+                                     EGLint height,
+                                     bool largest,
+                                     const FunctionsGLX &glx,
+                                     glx::Context context,
+                                     glx::FBConfig fbConfig)
+    : SurfaceGLX(renderer),
       mWidth(width),
       mHeight(height),
       mLargest(largest),
@@ -37,10 +43,16 @@ PbufferSurfaceGLX::~PbufferSurfaceGLX()
 
 egl::Error PbufferSurfaceGLX::initialize()
 {
+    // Avoid creating 0-sized PBuffers as it fails on the Intel Mesa driver
+    // as commented on https://bugs.freedesktop.org/show_bug.cgi?id=38869 so we
+    // use (w, 1) or (1, h) instead.
+    int width = std::max(1, static_cast<int>(mWidth));
+    int height = std::max(1, static_cast<int>(mHeight));
+
     const int attribs[] =
     {
-        GLX_PBUFFER_WIDTH, static_cast<int>(mWidth),
-        GLX_PBUFFER_HEIGHT, static_cast<int>(mHeight),
+        GLX_PBUFFER_WIDTH, width,
+        GLX_PBUFFER_HEIGHT, height,
         GLX_LARGEST_PBUFFER, mLargest,
         None
     };
@@ -85,7 +97,7 @@ egl::Error PbufferSurfaceGLX::querySurfacePointerANGLE(EGLint attribute, void **
     return egl::Error(EGL_SUCCESS);
 }
 
-egl::Error PbufferSurfaceGLX::bindTexImage(EGLint buffer)
+egl::Error PbufferSurfaceGLX::bindTexImage(gl::Texture *texture, EGLint buffer)
 {
     UNIMPLEMENTED();
     return egl::Error(EGL_SUCCESS);
@@ -122,4 +134,9 @@ EGLint PbufferSurfaceGLX::getSwapBehavior() const
     return EGL_BUFFER_PRESERVED;
 }
 
+egl::Error PbufferSurfaceGLX::checkForResize()
+{
+    // The size of pbuffers never change
+    return egl::Error(EGL_SUCCESS);
+}
 }

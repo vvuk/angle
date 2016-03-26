@@ -85,7 +85,7 @@ static bool InitializeAppKit()
     return true;
 }
 
-// NS's abd CG's coordinate system starts at the bottom left, while OSWindow's coordinate
+// NS's and CG's coordinate systems start at the bottom left, while OSWindow's coordinate
 // system starts at the top left. This function converts the Y coordinate accordingly.
 static float YCoordToFromCG(float y)
 {
@@ -105,6 +105,11 @@ static float YCoordToFromCG(float y)
         return self;
     }
 
+    - (void) onOSXWindowDeleted
+    {
+        mWindow = nil;
+    }
+
     - (BOOL) windowShouldClose: (id) sender
     {
         Event event;
@@ -115,7 +120,7 @@ static float YCoordToFromCG(float y)
 
     - (void) windowDidResize: (NSNotification*) notification
     {
-        NSSize windowSize = [mWindow->getNSWindow() frame].size;
+        NSSize windowSize = [[mWindow->getNSWindow() contentView] frame].size;
         Event event;
         event.Type = Event::EVENT_RESIZED;
         event.Size.Width = windowSize.width;
@@ -125,7 +130,7 @@ static float YCoordToFromCG(float y)
 
     - (void) windowDidMove: (NSNotification*) notification
     {
-        NSRect screenspace = [mWindow->getNSWindow() contentRectForFrameRect:[mWindow->getNSWindow() frame]];
+        NSRect screenspace = [mWindow->getNSWindow() frame];
         Event event;
         event.Type = Event::EVENT_MOVED;
         event.Move.X = screenspace.origin.x;
@@ -138,13 +143,18 @@ static float YCoordToFromCG(float y)
         Event event;
         event.Type = Event::EVENT_GAINED_FOCUS;
         mWindow->pushEvent(event);
+        [self retain];
     }
 
     - (void) windowDidResignKey: (NSNotification*) notification
     {
-        Event event;
-        event.Type = Event::EVENT_LOST_FOCUS;
-        mWindow->pushEvent(event);
+        if (mWindow != nil)
+        {
+            Event event;
+            event.Type = Event::EVENT_LOST_FOCUS;
+            mWindow->pushEvent(event);
+        }
+        [self release];
     }
 @end
 
@@ -304,7 +314,7 @@ static MouseButton TranslateMouseButton(int button)
 
     - (void) dealloc
     {
-        [mTrackingArea dealloc];
+        [mTrackingArea release];
         [super dealloc];
     }
 
@@ -546,11 +556,13 @@ bool OSXWindow::initialize(const std::string &name, size_t width, size_t height)
     {
         return false;
     }
+    [mView setWantsLayer:YES];
 
     [mWindow setContentView: mView];
     [mWindow setTitle: [NSString stringWithUTF8String: name.c_str()]];
     [mWindow setAcceptsMouseMovedEvents: YES];
     [mWindow center];
+
     [NSApp activateIgnoringOtherApps: YES];
 
     mX = 0;
@@ -568,6 +580,7 @@ void OSXWindow::destroy()
 
     [mView release];
     mView = nil;
+    [mDelegate onOSXWindowDeleted];
     [mDelegate release];
     mDelegate = nil;
     [mWindow release];
@@ -576,15 +589,12 @@ void OSXWindow::destroy()
 
 EGLNativeWindowType OSXWindow::getNativeWindow() const
 {
-    //TODO(cwallez): implement it once we have defined what EGLNativeWindowType is
-    UNIMPLEMENTED();
-    return static_cast<EGLNativeWindowType>(0);
+    return [mView layer];
 }
 
 EGLNativeDisplayType OSXWindow::getNativeDisplay() const
 {
-    //TODO(cwallez): implement it once we have defined what EGLNativeWindowType is
-    UNIMPLEMENTED();
+    // TODO(cwallez): implement it once we have defined what EGLNativeDisplayType is
     return static_cast<EGLNativeDisplayType>(0);
 }
 
@@ -610,7 +620,13 @@ void OSXWindow::messageLoop()
 void OSXWindow::setMousePosition(int x, int y)
 {
     y = [mWindow frame].size.height - y -1;
-    NSPoint screenspace = [mWindow convertRectToScreen: NSMakeRect(x, y, 0, 0)].origin;
+    NSPoint screenspace;
+
+    #if MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_7
+        screenspace = [mWindow convertBaseToScreen: NSMakePoint(x, y)];
+    #else
+        screenspace = [mWindow convertRectToScreen: NSMakeRect(x, y, 0, 0)].origin;
+    #endif
     CGWarpMouseCursorPosition(CGPointMake(screenspace.x, YCoordToFromCG(screenspace.y)));
 }
 

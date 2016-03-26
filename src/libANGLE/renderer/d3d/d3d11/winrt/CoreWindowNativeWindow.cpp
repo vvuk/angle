@@ -134,7 +134,13 @@ void CoreWindowNativeWindow::unregisterForSizeChangeEvents()
     mSizeChangedEventToken.value = 0;
 }
 
-HRESULT CoreWindowNativeWindow::createSwapChain(ID3D11Device *device, DXGIFactory *factory, DXGI_FORMAT format, unsigned int width, unsigned int height, DXGISwapChain **swapChain)
+HRESULT CoreWindowNativeWindow::createSwapChain(ID3D11Device *device,
+                                                DXGIFactory *factory,
+                                                DXGI_FORMAT format,
+                                                unsigned int width,
+                                                unsigned int height,
+                                                bool containsAlpha,
+                                                DXGISwapChain **swapChain)
 {
     if (device == NULL || factory == NULL || swapChain == NULL || width == 0 || height == 0)
     {
@@ -148,10 +154,12 @@ HRESULT CoreWindowNativeWindow::createSwapChain(ID3D11Device *device, DXGIFactor
     swapChainDesc.Stereo = FALSE;
     swapChainDesc.SampleDesc.Count = 1;
     swapChainDesc.SampleDesc.Quality = 0;
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_BACK_BUFFER;
+    swapChainDesc.BufferUsage =
+        DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_BACK_BUFFER;
     swapChainDesc.BufferCount = 2;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
     swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+    swapChainDesc.AlphaMode             = DXGI_ALPHA_MODE_UNSPECIFIED;
 
     *swapChain = nullptr;
 

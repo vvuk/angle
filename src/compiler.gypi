@@ -15,8 +15,9 @@
             '../include/GLES2/gl2ext.h',
             '../include/GLES2/gl2platform.h',
             '../include/GLES3/gl3.h',
-            '../include/GLES3/gl3ext.h',
             '../include/GLES3/gl3platform.h',
+            '../include/GLES3/gl31.h',
+            '../include/GLES3/gl32.h',
             '../include/GLSLANG/ShaderLang.h',
             '../include/GLSLANG/ShaderVars.h',
             '../include/KHR/khrplatform.h',
@@ -24,8 +25,6 @@
             'compiler/translator/BaseTypes.h',
             'compiler/translator/BuiltInFunctionEmulator.cpp',
             'compiler/translator/BuiltInFunctionEmulator.h',
-            'compiler/translator/BuiltInFunctionEmulatorGLSL.cpp',
-            'compiler/translator/BuiltInFunctionEmulatorGLSL.h',
             'compiler/translator/Cache.cpp',
             'compiler/translator/Cache.h',
             'compiler/translator/CallDAG.cpp',
@@ -69,12 +68,6 @@
             'compiler/translator/NodeSearch.h',
             'compiler/translator/Operator.cpp',
             'compiler/translator/Operator.h',
-            'compiler/translator/OutputESSL.cpp',
-            'compiler/translator/OutputESSL.h',
-            'compiler/translator/OutputGLSL.cpp',
-            'compiler/translator/OutputGLSL.h',
-            'compiler/translator/OutputGLSLBase.cpp',
-            'compiler/translator/OutputGLSLBase.h',
             'compiler/translator/ParseContext.cpp',
             'compiler/translator/ParseContext.h',
             'compiler/translator/PoolAlloc.cpp',
@@ -88,6 +81,8 @@
             'compiler/translator/RegenerateStructNames.h',
             'compiler/translator/RemovePow.cpp',
             'compiler/translator/RemovePow.h',
+            'compiler/translator/RewriteDoWhile.cpp',
+            'compiler/translator/RewriteDoWhile.h',
             'compiler/translator/RenameFunction.h',
             'compiler/translator/ScalarizeVecAndMatConstructorArgs.cpp',
             'compiler/translator/ScalarizeVecAndMatConstructorArgs.h',
@@ -95,10 +90,6 @@
             'compiler/translator/SearchSymbol.h',
             'compiler/translator/SymbolTable.cpp',
             'compiler/translator/SymbolTable.h',
-            'compiler/translator/TranslatorESSL.cpp',
-            'compiler/translator/TranslatorESSL.h',
-            'compiler/translator/TranslatorGLSL.cpp',
-            'compiler/translator/TranslatorGLSL.h',
             'compiler/translator/Types.cpp',
             'compiler/translator/Types.h',
             'compiler/translator/UnfoldShortCircuitAST.cpp',
@@ -107,6 +98,8 @@
             'compiler/translator/ValidateGlobalInitializer.h',
             'compiler/translator/ValidateLimitations.cpp',
             'compiler/translator/ValidateLimitations.h',
+            'compiler/translator/ValidateMaxParameters.h',
+            'compiler/translator/ValidateMaxParameters.cpp',
             'compiler/translator/ValidateOutputs.cpp',
             'compiler/translator/ValidateOutputs.h',
             'compiler/translator/ValidateSwitch.cpp',
@@ -115,8 +108,6 @@
             'compiler/translator/VariableInfo.h',
             'compiler/translator/VariablePacker.cpp',
             'compiler/translator/VariablePacker.h',
-            'compiler/translator/VersionGLSL.cpp',
-            'compiler/translator/VersionGLSL.h',
             'compiler/translator/blocklayout.cpp',
             'compiler/translator/blocklayout.h',
             'compiler/translator/depgraph/DependencyGraph.cpp',
@@ -134,7 +125,6 @@
             'compiler/translator/glslang_tab.h',
             'compiler/translator/intermOut.cpp',
             'compiler/translator/length_limits.h',
-            'compiler/translator/parseConst.cpp',
             'compiler/translator/timing/RestrictFragmentShaderTiming.cpp',
             'compiler/translator/timing/RestrictFragmentShaderTiming.h',
             'compiler/translator/timing/RestrictVertexShaderTiming.cpp',
@@ -143,6 +133,28 @@
             'compiler/translator/util.h',
             'third_party/compiler/ArrayBoundsClamper.cpp',
             'third_party/compiler/ArrayBoundsClamper.h',
+        ],
+        'angle_translator_lib_essl_sources':
+        [
+            'compiler/translator/OutputESSL.cpp',
+            'compiler/translator/OutputESSL.h',
+            'compiler/translator/TranslatorESSL.cpp',
+            'compiler/translator/TranslatorESSL.h',
+        ],
+        'angle_translator_lib_glsl_sources':
+        [
+            'compiler/translator/BuiltInFunctionEmulatorGLSL.cpp',
+            'compiler/translator/BuiltInFunctionEmulatorGLSL.h',
+            'compiler/translator/ExtensionGLSL.cpp',
+            'compiler/translator/ExtensionGLSL.h',
+            'compiler/translator/OutputGLSL.cpp',
+            'compiler/translator/OutputGLSL.h',
+            'compiler/translator/OutputGLSLBase.cpp',
+            'compiler/translator/OutputGLSLBase.h',
+            'compiler/translator/TranslatorGLSL.cpp',
+            'compiler/translator/TranslatorGLSL.h',
+            'compiler/translator/VersionGLSL.cpp',
+            'compiler/translator/VersionGLSL.h',
         ],
         'angle_translator_lib_hlsl_sources':
         [
@@ -156,6 +168,8 @@
             'compiler/translator/BuiltInFunctionEmulatorHLSL.h',
             'compiler/translator/OutputHLSL.cpp',
             'compiler/translator/OutputHLSL.h',
+            'compiler/translator/RemoveDynamicIndexing.cpp',
+            'compiler/translator/RemoveDynamicIndexing.h',
             'compiler/translator/RemoveSwitchFallThrough.cpp',
             'compiler/translator/RemoveSwitchFallThrough.h',
             'compiler/translator/RewriteElseBlocks.cpp',
@@ -217,18 +231,6 @@
             'type': 'static_library',
             'includes': [ '../build/common_defines.gypi', ],
             'sources': [ '<@(angle_preprocessor_sources)', ],
-            'conditions':
-            [
-                ['angle_build_winrt==1',
-                {
-                    'msvs_enable_winrt' : '1',
-                    'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
-                }],
-                ['angle_build_winphone==1',
-                {
-                    'msvs_enable_winphone' : '1',
-                }],
-            ],
         },
         {
             'target_name': 'translator_lib',
@@ -259,14 +261,41 @@
             },
             'conditions':
             [
-                ['angle_build_winrt==1',
+                ['angle_enable_essl==1',
                 {
-                    'msvs_enable_winrt' : '1',
-                    'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
+                    'defines':
+                    [
+                        'ANGLE_ENABLE_ESSL',
+                    ],
+                    'direct_dependent_settings':
+                    {
+                        'defines':
+                        [
+                            'ANGLE_ENABLE_ESSL',
+                        ],
+                    },
+                    'sources':
+                    [
+                        '<@(angle_translator_lib_essl_sources)',
+                    ],
                 }],
-                ['angle_build_winphone==1',
+                ['angle_enable_glsl==1',
                 {
-                    'msvs_enable_winphone' : '1',
+                    'defines':
+                    [
+                        'ANGLE_ENABLE_GLSL',
+                    ],
+                    'direct_dependent_settings':
+                    {
+                        'defines':
+                        [
+                            'ANGLE_ENABLE_GLSL',
+                        ],
+                    },
+                    'sources':
+                    [
+                        '<@(angle_translator_lib_glsl_sources)',
+                    ],
                 }],
                 ['angle_enable_hlsl==1',
                 {
@@ -308,18 +337,6 @@
                 'compiler/translator/ShaderLang.cpp',
                 'compiler/translator/ShaderVars.cpp'
             ],
-            'conditions':
-            [
-                ['angle_build_winrt==1',
-                {
-                    'msvs_enable_winrt' : '1',
-                    'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
-                }],
-                ['angle_build_winphone==1',
-                {
-                    'msvs_enable_winphone' : '1',
-                }],
-            ],
         },
 
         {
@@ -347,18 +364,6 @@
             [
                 'compiler/translator/ShaderLang.cpp',
                 'compiler/translator/ShaderVars.cpp'
-            ],
-            'conditions':
-            [
-                ['angle_build_winrt==1',
-                {
-                    'msvs_enable_winrt' : '1',
-                    'msvs_application_type_revision' : '<(angle_build_winrt_app_type_revision)',
-                }],
-                ['angle_build_winphone==1',
-                {
-                    'msvs_enable_winphone' : '1',
-                }],
             ],
         },
     ],

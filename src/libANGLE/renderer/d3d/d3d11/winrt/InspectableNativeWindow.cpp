@@ -11,9 +11,20 @@
 
 namespace rx
 {
-NativeWindow::NativeWindow(EGLNativeWindowType window)
+NativeWindow::NativeWindow(EGLNativeWindowType window,
+                           const egl::Config *config,
+                           bool directComposition)
 {
     mWindow = window;
+    mConfig = config;
+}
+
+NativeWindow::~NativeWindow()
+{
+}
+
+void NativeWindow::commitChange()
+{
 }
 
 bool NativeWindow::initialize()
@@ -83,7 +94,9 @@ HRESULT NativeWindow::createSwapChain(ID3D11Device *device, DXGIFactory *factory
 {
     if (mImpl)
     {
-        return mImpl->createSwapChain(device, factory, format, width, height, swapChain);
+        bool containsAlpha = (mConfig->alphaSize > 0);
+        return mImpl->createSwapChain(device, factory, format, width, height, containsAlpha,
+                                      swapChain);
     }
 
     return E_UNEXPECTED;

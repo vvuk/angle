@@ -59,6 +59,27 @@ bool TStructure::equals(const TStructure &other) const
     return (uniqueId() == other.uniqueId());
 }
 
+TString TType::getCompleteString() const
+{
+    TStringStream stream;
+
+    if (invariant)
+        stream << "invariant ";
+    if (qualifier != EvqTemporary && qualifier != EvqGlobal)
+        stream << getQualifierString() << " ";
+    if (precision != EbpUndefined)
+        stream << getPrecisionString() << " ";
+    if (array)
+        stream << "array[" << getArraySize() << "] of ";
+    if (isMatrix())
+        stream << getCols() << "X" << getRows() << " matrix of ";
+    else if (isVector())
+        stream << getNominalSize() << "-component vector of ";
+
+    stream << getBasicString();
+    return stream.str();
+}
+
 //
 // Recursively generate mangled names.
 //
@@ -223,9 +244,9 @@ bool TStructure::containsSamplers() const
     return false;
 }
 
-TString TFieldListCollection::buildMangledName() const
+TString TFieldListCollection::buildMangledName(const TString &mangledNamePrefix) const
 {
-    TString mangledName(mangledNamePrefix());
+    TString mangledName(mangledNamePrefix);
     mangledName += *mName;
     for (size_t i = 0; i < mFields->size(); ++i)
     {
