@@ -108,7 +108,8 @@ CXXFLAGS += \
 	-DANGLE_EXPORT="" \
 	-Iinclude \
 	-Isrc \
-	-O3 \
+  -O3   \
+  -Wall \
 	-DCOMPONENT_BUILD \
 	$(NULL)
 
@@ -123,6 +124,10 @@ ALL_OBJS = $(ALL_CPP_SRC:%.cpp=$(OUT_DIR)/%.o)
 
 .PHONY: all
 all: $(OUT_DIR)/libglslang.a
+
+$(OUT_DIR)/glslang-c.o: src/glslang.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $< -o $@ -c $(CXXFLAGS) -Werror
 
 $(OUT_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)

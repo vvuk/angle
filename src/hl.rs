@@ -2,6 +2,7 @@ use super::ffi::*;
 
 use libc;
 use std::ffi::CStr;
+use std::ffi::CString;
 use std::mem;
 use std::default;
 
@@ -137,10 +138,18 @@ impl ShaderValidator {
         Self::new(shader_type, ShaderSpec::WebGL, output, resources)
     }
 
-    pub fn compile(&self, strings: &[&[u8]], options: i32) -> Result<(), &'static str> {
+    pub fn compile(&self, strings: &[&str], options: i32) -> Result<(), &'static str> {
+        let mut cstrings = Vec::with_capacity(strings.len());
+
+        for s in strings.iter() {
+            cstrings.push(try!(CString::new(*s).map_err(|_| "Found invalid characters")))
+        }
+
+        let cptrs: Vec<_> = cstrings.iter().map(|s| s.as_ptr()).collect();
+
         if unsafe { GLSLangCompile(self.handle,
-                                   strings.as_ptr() as *const *const libc::c_char,
-                                   strings.len() as libc::size_t,
+                                   cptrs.as_ptr() as *const *const libc::c_char,
+                                   cstrings.len() as libc::size_t,
                                    options) } == 0 {
             return Err("Couldn't compile shader")
         }
@@ -161,7 +170,8 @@ impl ShaderValidator {
         }
     }
 
-    pub fn compile_and_translate(&self, strings: &[&[u8]]) -> Result<String, &'static str> {
+    pub fn compile_and_translate(&self, strings: &[&str]) -> Result<String, &'static str> {
+
         let options = SH_VALIDATE | SH_OBJECT_CODE |
                       SH_EMULATE_BUILT_IN_FUNCTIONS | // To workaround drivers
                       SH_TIMING_RESTRICTIONS |
