@@ -8,4 +8,7 @@ license = "MIT"
 build = "build.rs"
 
 [dependencies]
-libc = "*"
+libc = "0.2"
+
+[build-dependencies]
+cmake = "0.1"
