@@ -12,7 +12,6 @@ GLSLANG_CPP_SRC = \
 	src/compiler/translator/TranslatorGLSL.cpp \
 	src/compiler/translator/TranslatorESSL.cpp \
 	src/compiler/translator/InitializeDll.cpp \
-	src/compiler/translator/SeparateArrayInitialization.cpp \
 	src/compiler/translator/util.cpp \
 	src/compiler/translator/RemovePow.cpp \
 	src/compiler/translator/BuiltInFunctionEmulatorGLSL.cpp \
@@ -25,13 +24,10 @@ GLSLANG_CPP_SRC = \
 	src/compiler/translator/Intermediate.cpp \
 	src/compiler/translator/ShaderLang.cpp \
 	src/compiler/translator/LoopInfo.cpp \
-	src/compiler/translator/UnfoldShortCircuitToIf.cpp \
-	src/compiler/translator/ArrayReturnValueToOutParameter.cpp \
 	src/compiler/translator/ValidateLimitations.cpp \
 	src/compiler/translator/Initialize.cpp \
 	src/compiler/translator/CodeGen.cpp \
 	src/compiler/translator/VariablePacker.cpp \
-	src/compiler/translator/SeparateDeclarations.cpp \
 	src/compiler/translator/BuiltInFunctionEmulator.cpp \
 	src/compiler/translator/Operator.cpp \
 	src/compiler/translator/SymbolTable.cpp \
@@ -41,7 +37,6 @@ GLSLANG_CPP_SRC = \
 	src/compiler/translator/SearchSymbol.cpp \
 	src/compiler/translator/VariableInfo.cpp \
 	src/compiler/translator/OutputGLSLBase.cpp \
-	src/compiler/translator/RewriteElseBlocks.cpp \
 	src/compiler/translator/ValidateMaxParameters.cpp \
 	src/compiler/translator/RewriteDoWhile.cpp \
 	src/compiler/translator/intermOut.cpp \
@@ -67,9 +62,7 @@ GLSLANG_CPP_SRC = \
 	src/compiler/translator/VersionGLSL.cpp \
 	src/compiler/translator/ExtensionGLSL.cpp \
 	src/compiler/translator/ShaderVars.cpp \
-	src/compiler/translator/SeparateExpressionsReturningArrays.cpp \
 	src/compiler/translator/ValidateSwitch.cpp \
-	src/compiler/translator/RemoveSwitchFallThrough.cpp \
 	src/compiler/translator/InitializeVariables.cpp \
 	src/compiler/translator/Diagnostics.cpp \
 	src/compiler/translator/timing/RestrictFragmentShaderTiming.cpp \
