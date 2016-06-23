@@ -20,3 +20,7 @@ os:
 script:
   - cargo build --verbose
   - cargo test --verbose
+
+notifications:
+  webhooks: http://build.servo.org:54856/travis
+
