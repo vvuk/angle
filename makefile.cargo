@@ -103,6 +103,8 @@ CXXFLAGS += \
 	-DANGLE_ENABLE_GLSL \
 	-DLIBGLESV2_EXPORT_H_ \
 	-DANGLE_EXPORT="" \
+	-DANGLE_PLATFORM_EXPORT="" \
+	-DLIBANGLE_IMPLEMENTATION \
 	-Iinclude \
 	-Isrc \
   -O3   \
@@ -113,7 +115,7 @@ CXXFLAGS += \
 ifeq ("$(MSYSTEM)","")
 CXXFLAGS += -fPIC
 else
-OUT_DIR := $(shell cygpath "$(OUT_DIR)")
+OUT_DIR := $(shell cygpath -m "$(OUT_DIR)")
 endif
 
 ALL_CPP_SRC = $(GLSLANG_CPP_SRC)
